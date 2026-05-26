@@ -341,7 +341,13 @@ export function TechnicianAppointments({
                 updateAppointmentStatus(selectedJobForCompletion.id, "Completed", undefined, undefined, additionalCost, notes, undefined, parts);
               }
             }}
-            serviceBaseCost={selectedJobForCompletion?.servicePrice}
+            serviceBaseCost={
+              selectedJobForCompletion?.servicePrice ??
+              selectedJobForCompletion?.service_price ??
+              selectedJobForCompletion?.estimated_price ??
+              selectedJobForCompletion?.estimate_price ??
+              0
+            }
             serviceName={selectedJobForCompletion?.service}
           />
     </div>

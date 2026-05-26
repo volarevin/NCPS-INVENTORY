@@ -185,18 +185,28 @@ export default function TechnicianPage() {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/api/technician/jobs', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const [jobsResponse, servicesResponse] = await Promise.all([
+        fetch('http://localhost:5000/api/technician/jobs', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch('http://localhost:5000/api/services')
+      ]);
 
-      if (response.status === 401) {
+      if (jobsResponse.status === 401) {
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('user');
         navigate('/login');
         return;
       }
 
-      const data = await response.json();
+      const data = await jobsResponse.json();
+      const servicesData = servicesResponse.ok ? await servicesResponse.json() : [];
+      const servicePriceMap = new Map(
+        (Array.isArray(servicesData) ? servicesData : []).map((service: any) => [
+          String(service.service_id),
+          Number(service.base_price || 0)
+        ])
+      );
 
       const formatted = data.map((job: any) => {
         // Normalize status
@@ -208,12 +218,24 @@ export default function TechnicianPage() {
           status = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
         }
 
+        const serviceBase = Number(
+          job.estimated_price ??
+          job.estimate_price ??
+          job.service_price ??
+          job.base_price ??
+          job.price ??
+          job.total_cost ??
+          0
+        );
+        const fallbackBase = job.service_id ? servicePriceMap.get(String(job.service_id)) ?? 0 : 0;
+        const resolvedServiceBase = serviceBase || fallbackBase;
+
         return {
           id: job.appointment_id.toString(),
           customerName: `${job.customer_first_name} ${job.customer_last_name}`,
           service: job.service_name,
           serviceId: job.service_id ? job.service_id.toString() : undefined,
-          servicePrice: Number(job.service_price || 0),
+          servicePrice: Number.isFinite(resolvedServiceBase) ? resolvedServiceBase : 0,
           date: new Date(job.appointment_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
           time: new Date(job.appointment_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
           phone: job.customer_phone || 'N/A',
