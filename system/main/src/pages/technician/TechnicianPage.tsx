@@ -4,6 +4,7 @@ import { useFeedback } from "@/context/FeedbackContext";
 import { Calendar, CheckCircle, PlayCircle, Star, StarHalf } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { getProfilePictureUrl } from "@/lib/utils";
+import { apiUrl } from '@/config/api';
 import { TechnicianSidebar } from "./components/TechnicianSidebar";
 import { TechnicianDashboardContent } from "./components/TechnicianDashboardContent";
 import { TechnicianAppointments } from "./components/TechnicianAppointments";
@@ -52,7 +53,7 @@ export default function TechnicianPage() {
   // Heartbeat
   useEffect(() => {
     const sendHeartbeat = () => {
-      fetch('http://localhost:5000/api/auth/heartbeat', {
+      fetch(apiUrl('/api/auth/heartbeat'), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -70,7 +71,7 @@ export default function TechnicianPage() {
   const fetchAvailability = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/technician/availability', {
+      const res = await fetch(apiUrl('/api/technician/availability'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -91,7 +92,7 @@ export default function TechnicianPage() {
   // const handleStatusChange = async (newStatus: string) => {
   //     try {
   //         const token = localStorage.getItem('token');
-  //         const res = await fetch('http://localhost:5000/api/technician/availability', {
+  //         const res = await fetch(apiUrl('/api/technician/availability'), {
   //             method: 'PUT',
   //             headers: { 
   //                 'Content-Type': 'application/json',
@@ -128,7 +129,7 @@ export default function TechnicianPage() {
         navigate('/login');
         return;
       }
-      const response = await fetch('http://localhost:5000/api/technician/notifications', {
+      const response = await fetch(apiUrl('/api/technician/notifications'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -150,7 +151,7 @@ export default function TechnicianPage() {
     e.stopPropagation();
     try {
         const token = sessionStorage.getItem('token');
-        await fetch(`http://localhost:5000/api/technician/notifications/${id}`, {
+        await fetch(apiUrl(`/api/technician/notifications/${id}`), {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -163,7 +164,7 @@ export default function TechnicianPage() {
   const handleClearAllNotifications = async () => {
     try {
         const token = sessionStorage.getItem('token');
-        await fetch('http://localhost:5000/api/technician/notifications', {
+        await fetch(apiUrl('/api/technician/notifications'), {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -182,10 +183,10 @@ export default function TechnicianPage() {
       }
 
       const [jobsResponse, servicesResponse] = await Promise.all([
-        fetch('http://localhost:5000/api/technician/jobs', {
+        fetch(apiUrl('/api/technician/jobs'), {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch('http://localhost:5000/api/services')
+        fetch(apiUrl('/api/services'))
       ]);
 
       if (jobsResponse.status === 401) {
@@ -259,7 +260,7 @@ export default function TechnicianPage() {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/api/technician/profile', {
+      const response = await fetch(apiUrl('/api/technician/profile'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -314,7 +315,7 @@ export default function TechnicianPage() {
   ) => {
     const promise = async () => {
       if (newStatus === "Completed" && Array.isArray(parts) && parts.length > 0) {
-        const partsResponse = await fetch(`http://localhost:5000/api/appointments/${appointmentId}/parts`, {
+        const partsResponse = await fetch(apiUrl(`/api/appointments/${appointmentId}/parts`), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -336,7 +337,7 @@ export default function TechnicianPage() {
       if (costNotes) body.costNotes = costNotes;
       if (overrideEarlyStart) body.overrideEarlyStart = true;
 
-      const response = await fetch(`http://localhost:5000/api/appointments/${appointmentId}/status`, {
+      const response = await fetch(apiUrl(`/api/appointments/${appointmentId}/status`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -366,7 +367,7 @@ export default function TechnicianPage() {
 
   // const _updateProfile = async (updatedProfile: any) => {
   //   const promise = async () => {
-  //     const response = await fetch('http://localhost:5000/api/technician/profile', {
+  //     const response = await fetch(apiUrl('/api/technician/profile'), {
   //       method: 'PUT',
   //       headers: {
   //         'Content-Type': 'application/json',

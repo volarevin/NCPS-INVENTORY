@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiUrl } from '@/config/api';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -92,7 +93,7 @@ export function Dashboard({ onAppointmentClick: _propOnAppointmentClick }: Dashb
         navigate('/login');
         return;
       }
-      const response = await fetch('http://localhost:5000/api/receptionist/dashboard-stats', {
+      const response = await fetch(apiUrl('/api/receptionist/dashboard-stats'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -157,7 +158,7 @@ export function Dashboard({ onAppointmentClick: _propOnAppointmentClick }: Dashb
       let backendStatus = status.charAt(0).toUpperCase() + status.slice(1);
       if (status === 'in-progress') backendStatus = 'In Progress';
 
-      const response = await fetch(`http://localhost:5000/api/receptionist/appointments/${id}/status`, {
+      const response = await fetch(apiUrl(`/api/receptionist/appointments/${id}/status`), {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -186,7 +187,7 @@ export function Dashboard({ onAppointmentClick: _propOnAppointmentClick }: Dashb
       const token = sessionStorage.getItem('token');
       const status = statusDialog.type === 'reject' ? 'rejected' : 'cancelled';
       
-      const response = await fetch(`http://localhost:5000/api/receptionist/appointments/${statusDialog.appointmentId}/status`, {
+      const response = await fetch(apiUrl(`/api/receptionist/appointments/${statusDialog.appointmentId}/status`), {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -453,7 +454,7 @@ export function Dashboard({ onAppointmentClick: _propOnAppointmentClick }: Dashb
                     body.technicianId = technicianId;
                 }
                 
-                const response = await fetch(`http://localhost:5000/api/receptionist/appointments/${id}/status`, {
+                const response = await fetch(apiUrl(`/api/receptionist/appointments/${id}/status`), {
                     method: 'PUT',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -478,7 +479,7 @@ export function Dashboard({ onAppointmentClick: _propOnAppointmentClick }: Dashb
           onUpdateDetails={async (id, date, time, technicianId) => {
             const promise = async () => {
               const token = sessionStorage.getItem('token');
-              const response = await fetch(`http://localhost:5000/api/receptionist/appointments/${id}/details`, {
+              const response = await fetch(apiUrl(`/api/receptionist/appointments/${id}/details`), {
                 method: 'PUT',
                 headers: { 
                   'Authorization': `Bearer ${token}`,

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiUrl } from '@/config/api';
 import { PageHeader } from "./PageHeader";
 import { Search, ChevronLeft, ChevronRight, Eye, Download, Calendar } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -60,7 +61,7 @@ export function AuditLogs() {
         ...(dateRange.end && { endDate: dateRange.end })
       });
 
-      const response = await fetch(`http://localhost:5000/api/admin/audit-logs?${queryParams}`, {
+      const response = await fetch(apiUrl(`/api/admin/audit-logs?${queryParams}`), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -87,7 +88,7 @@ export function AuditLogs() {
         ...(dateRange.end && { endDate: dateRange.end })
       });
 
-      const response = await fetch(`http://localhost:5000/api/admin/audit-logs/export?${queryParams}`, {
+      const response = await fetch(apiUrl(`/api/admin/audit-logs/export?${queryParams}`), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -255,7 +256,7 @@ export function AuditLogs() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarImage src={`http://localhost:5000${log.actor_avatar}`} />
+                            <AvatarImage src={apiUrl(`${log.actor_avatar}`)} />
                             <AvatarFallback>{(log.actor_first_name?.[0] || log.actor_username_real?.[0] || '?').toUpperCase()}</AvatarFallback>
                           </Avatar>
                           <div className="flex flex-col">
@@ -334,7 +335,7 @@ export function AuditLogs() {
                   <h4 className="text-sm font-medium text-muted-foreground">Actor</h4>
                   <div className="flex items-center gap-2">
                     <Avatar className="h-6 w-6">
-                      <AvatarImage src={`http://localhost:5000${selectedLog?.actor_avatar}`} />
+                      <AvatarImage src={apiUrl(`${selectedLog?.actor_avatar}`)} />
                       <AvatarFallback>U</AvatarFallback>
                     </Avatar>
                     <span className="text-sm font-medium">

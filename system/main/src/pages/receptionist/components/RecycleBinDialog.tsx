@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiUrl } from '@/config/api';
 import {
   Dialog,
   DialogContent,
@@ -37,7 +38,7 @@ export function RecycleBinDialog({ open, onOpenChange }: RecycleBinDialogProps) 
       const token = sessionStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('http://localhost:5000/api/receptionist/appointments/marked-deletion', {
+      const response = await fetch(apiUrl('/api/receptionist/appointments/marked-deletion'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -68,7 +69,7 @@ export function RecycleBinDialog({ open, onOpenChange }: RecycleBinDialogProps) 
       const token = sessionStorage.getItem('token');
       if (!token) throw new Error("No token found");
 
-      const response = await fetch(`http://localhost:5000/api/receptionist/appointments/${id}/restore`, {
+      const response = await fetch(apiUrl(`/api/receptionist/appointments/${id}/restore`), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -93,7 +94,7 @@ export function RecycleBinDialog({ open, onOpenChange }: RecycleBinDialogProps) 
   //     const token = sessionStorage.getItem('token');
   //     if (!token) throw new Error("No token found");
 
-  //     const response = await fetch(`http://localhost:5000/api/receptionist/appointments/${id}/permanent`, {
+  //     const response = await fetch(apiUrl(`/api/receptionist/appointments/${id}/permanent`), {
   //       method: 'DELETE',
   //       headers: { 'Authorization': `Bearer ${token}` }
   //     });
@@ -118,7 +119,7 @@ export function RecycleBinDialog({ open, onOpenChange }: RecycleBinDialogProps) 
   //     const token = sessionStorage.getItem('token');
   //     if (!token) throw new Error("No token found");
 
-  //     const response = await fetch('http://localhost:5000/api/receptionist/appointments/recycle-bin', {
+  //     const response = await fetch(apiUrl('/api/receptionist/appointments/recycle-bin'), {
   //       method: 'DELETE',
   //       headers: { 'Authorization': `Bearer ${token}` }
   //     });

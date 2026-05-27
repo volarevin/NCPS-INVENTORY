@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiUrl } from '@/config/api';
 import { Star, User, Quote } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -17,7 +18,7 @@ export function Testimonials() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/public/testimonials')
+    fetch(apiUrl('/api/public/testimonials'))
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -81,7 +82,7 @@ export function Testimonials() {
                 <div className="flex items-center gap-3 mt-auto pt-4 border-t border-border/50">
                   <Avatar className="h-10 w-10 border border-border">
                     <AvatarImage 
-                      src={testimonial.profile_picture ? `http://localhost:5000${testimonial.profile_picture}` : undefined} 
+                      src={testimonial.profile_picture ? apiUrl(`${testimonial.profile_picture}`) : undefined} 
                       alt={`${testimonial.first_name} ${testimonial.last_name}`} 
                     />
                     <AvatarFallback className="bg-primary/10 text-primary">

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiUrl } from '@/config/api';
 import {
   Dialog,
   DialogContent,
@@ -56,7 +57,7 @@ export function RecycleBinDialog({ open, onOpenChange }: RecycleBinDialogProps) 
       const token = sessionStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('http://localhost:5000/api/admin/appointments/marked-deletion', {
+      const response = await fetch(apiUrl('/api/admin/appointments/marked-deletion'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -84,7 +85,7 @@ export function RecycleBinDialog({ open, onOpenChange }: RecycleBinDialogProps) 
       const token = sessionStorage.getItem('token');
       if (!token) throw new Error("No token found");
 
-      const response = await fetch(`http://localhost:5000/api/admin/appointments/${id}/restore`, {
+      const response = await fetch(apiUrl(`/api/admin/appointments/${id}/restore`), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -126,7 +127,7 @@ export function RecycleBinDialog({ open, onOpenChange }: RecycleBinDialogProps) 
         const token = sessionStorage.getItem('token');
         if (!token) throw new Error("No token found");
 
-        const response = await fetch(`http://localhost:5000/api/admin/appointments/${confirmDialog.id}/permanent`, {
+        const response = await fetch(apiUrl(`/api/admin/appointments/${confirmDialog.id}/permanent`), {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -147,7 +148,7 @@ export function RecycleBinDialog({ open, onOpenChange }: RecycleBinDialogProps) 
         const token = sessionStorage.getItem('token');
         if (!token) throw new Error("No token found");
 
-        const response = await fetch('http://localhost:5000/api/admin/appointments/recycle-bin', {
+        const response = await fetch(apiUrl('/api/admin/appointments/recycle-bin'), {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });

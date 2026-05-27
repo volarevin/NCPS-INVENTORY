@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiUrl } from '@/config/api';
 import { Search, Star, ChevronRight, Wrench, Laptop, Smartphone, Wifi, Shield, Camera, Server, Printer, Speaker } from 'lucide-react';
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
@@ -39,7 +40,7 @@ export function CustomerServices() {
   const fetchServices = async () => {
     try {
       const token = sessionStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/customer/services', {
+      const response = await fetch(apiUrl('/api/customer/services'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       

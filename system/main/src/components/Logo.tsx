@@ -1,4 +1,5 @@
 import React from 'react';
+import { apiUrl } from '@/config/api';
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
@@ -14,7 +15,7 @@ const sizeMap: Record<string, string> = {
 };
 
 export const Logo: React.FC<LogoProps> = ({ size = 'md', showText = false, className = '' }) => {
-  const src = 'http://localhost:5000/uploads/logo/ncps.png';
+  const src = apiUrl('/uploads/logo/ncps.png');
   
   return (
     <div className={`flex items-center justify-center ${className}`}>

@@ -1,4 +1,5 @@
 import { PageHeader } from "./PageHeader";
+import { apiUrl } from '@/config/api';
 import { useState, useEffect } from "react";
 import { Settings, Plus, Menu, Box } from "lucide-react";
 import { EditServiceDialog } from "./EditServiceDialog";
@@ -35,7 +36,7 @@ export function Services() {
     try {
         const token = sessionStorage.getItem('token');
         if (!token) return;
-        const response = await fetch('http://localhost:5000/api/admin/categories', {
+        const response = await fetch(apiUrl('/api/admin/categories'), {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
@@ -50,7 +51,7 @@ export function Services() {
         const token = sessionStorage.getItem('token');
         if (!token) return;
 
-        const response = await fetch('http://localhost:5000/api/admin/services', {
+        const response = await fetch(apiUrl('/api/admin/services'), {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
@@ -81,7 +82,7 @@ export function Services() {
       if (!token) return;
 
       const promise = async () => {
-        const response = await fetch(`http://localhost:5000/api/admin/categories/${id}`, {
+        const response = await fetch(apiUrl(`/api/admin/categories/${id}`), {
             method: 'PUT',
             headers: { 
                 'Content-Type': 'application/json',
@@ -127,7 +128,7 @@ export function Services() {
     const promise = async () => {
       if (selectedService) {
         // Edit existing service
-        const response = await fetch(`http://localhost:5000/api/admin/services/${service.id}`, {
+        const response = await fetch(apiUrl(`/api/admin/services/${service.id}`), {
           method: 'PUT',
           headers: { 
             'Content-Type': 'application/json',
@@ -148,7 +149,7 @@ export function Services() {
         return "Service updated successfully";
       } else {
         // Add new service
-        const response = await fetch('http://localhost:5000/api/admin/services', {
+        const response = await fetch(apiUrl('/api/admin/services'), {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -184,7 +185,7 @@ export function Services() {
     if (!token) return;
 
     const promise = async () => {
-      const response = await fetch(`http://localhost:5000/api/admin/services/${id}`, {
+      const response = await fetch(apiUrl(`/api/admin/services/${id}`), {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

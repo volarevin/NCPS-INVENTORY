@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
+const fs = require('fs');
 const db = require('./config/db');
 
 dotenv.config();
@@ -32,10 +33,33 @@ app.use('/api/profile', require('./routes/profileRoutes'));
 app.use('/api/public', require('./routes/publicRoutes'));
 app.use('/api/inventory', require('./routes/inventoryRoutes'));
 
+app.get('/api/health', (req, res) => {
+  db.query('SELECT 1 AS ok', (err) => {
+    if (err) {
+      return res.status(503).json({
+        ok: false,
+        db: false,
+        message: err.message,
+      });
+    }
+    res.json({ ok: true, db: true });
+  });
+});
+
 // Basic Route
 app.get('/', (req, res) => {
   res.send('NCPS Server is running');
 });
+
+// Serve built frontend when deployed as a single Node app
+const frontendDist = path.join(__dirname, '..', 'main', 'dist');
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  app.get(/^(?!\/api\/).*/, (req, res, next) => {
+    if (req.method !== 'GET') return next();
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 // Start Server
 app.listen(PORT, () => {

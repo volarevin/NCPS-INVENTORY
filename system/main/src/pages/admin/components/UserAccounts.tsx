@@ -6,6 +6,7 @@ import { AddUserDialog } from "./AddUserDialog";
 import { Search, Users, Shield, UserPlus, UserCheck, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { getProfilePictureUrl } from "@/lib/utils";
+import { apiUrl } from '@/config/api';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,7 +51,7 @@ export function UserAccounts() {
       const token = sessionStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('http://localhost:5000/api/admin/users', {
+      const response = await fetch(apiUrl('/api/admin/users'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -103,7 +104,7 @@ export function UserAccounts() {
     try {
       const token = sessionStorage.getItem('token');
       if (!token) return;
-      const response = await fetch(`http://localhost:5000/api/admin/users/${user.id}/logs`, {
+      const response = await fetch(apiUrl(`/api/admin/users/${user.id}/logs`), {
           headers: { 'Authorization': `Bearer ${token}` }
       });
       const logs = await response.json();
@@ -137,7 +138,7 @@ export function UserAccounts() {
   const handleClearAllNotifications = async () => {
     try {
         const token = sessionStorage.getItem('token');
-        const response = await fetch('http://localhost:5000/api/admin/notifications', {
+        const response = await fetch(apiUrl('/api/admin/notifications'), {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });

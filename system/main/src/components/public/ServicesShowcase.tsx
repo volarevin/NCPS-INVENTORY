@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiUrl } from '@/config/api';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +32,7 @@ export function ServicesShowcase() {
 
     const fetchServices = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/public/services');
+        const res = await fetch(apiUrl('/api/public/services'));
         if (res.ok) {
           const data = await res.json();
           setServices(data);
@@ -68,7 +69,7 @@ export function ServicesShowcase() {
                 <div className="relative h-48 overflow-hidden bg-muted">
                   {service.image ? (
                     <img 
-                      src={`http://localhost:5000/uploads/services/${service.image}`} 
+                      src={apiUrl(`/uploads/services/${service.image}`)} 
                       alt={service.name}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       loading="lazy"

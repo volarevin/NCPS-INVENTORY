@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiUrl } from '@/config/api';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, CheckCircle2, LayoutDashboard } from 'lucide-react';
@@ -102,7 +103,7 @@ export function Hero() {
              {/* Hero Image */}
              <div className="absolute inset-0 bg-muted">
                 <img 
-                  src="http://localhost:5000/uploads/services/hero-server.jpg" 
+                  src={apiUrl("/uploads/services/hero-server.jpg")} 
                   alt="Professional Technician" 
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                   onError={(e) => {

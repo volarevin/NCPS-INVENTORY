@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { apiUrl } from '@/config/api';
 import { Eye, EyeOff, Lock, User, ArrowRight, Mail, Phone, UserPlus, KeyRound, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -183,7 +184,7 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     
-    const API_URL = 'http://localhost:5000/api/auth';
+    const API_URL = apiUrl('/api/auth');
 
     if (viewMode === 'forgot-password') {
       const promise = async () => {

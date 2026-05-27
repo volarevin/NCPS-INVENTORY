@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { apiUrl } from '@/config/api';
 import { User, Mail, Phone, MapPin, Lock, Plus, Trash2, Star, Edit2, Save, X, Camera } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import { Button } from "@/components/ui/button";
@@ -66,7 +67,7 @@ export default function ProfilePage() {
   const fetchLoginHistory = async (page = 1) => {
     try {
       const token = sessionStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/profile/login-history?page=${page}&limit=5`, {
+      const response = await fetch(apiUrl(`/api/profile/login-history?page=${page}&limit=5`), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -83,7 +84,7 @@ export default function ProfilePage() {
   const fetchProfile = async () => {
     try {
       const token = sessionStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/profile', {
+      const response = await fetch(apiUrl('/api/profile'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -105,7 +106,7 @@ export default function ProfilePage() {
   const handleUpdateProfile = async () => {
     const promise = async () => {
       const token = sessionStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/profile', {
+      const response = await fetch(apiUrl('/api/profile'), {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -229,7 +230,7 @@ export default function ProfilePage() {
 
       const promise = async () => {
         const token = sessionStorage.getItem('token');
-        const response = await fetch('http://localhost:5000/api/profile/picture', {
+        const response = await fetch(apiUrl('/api/profile/picture'), {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
@@ -250,7 +251,7 @@ export default function ProfilePage() {
         // Actually, the sidebar reads from sessionStorage. We should update it.
         // Let's fetch the profile again and update session storage.
         
-        const profileResponse = await fetch('http://localhost:5000/api/profile', {
+        const profileResponse = await fetch(apiUrl('/api/profile'), {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const profileData = await profileResponse.json();
@@ -281,8 +282,8 @@ export default function ProfilePage() {
     const promise = async () => {
       const token = sessionStorage.getItem('token');
       const url = isEditingAddress 
-        ? `http://localhost:5000/api/profile/addresses/${addressForm.id}`
-        : 'http://localhost:5000/api/profile/addresses';
+        ? apiUrl(`/api/profile/addresses/${addressForm.id}`)
+        : apiUrl('/api/profile/addresses');
       
       const method = isEditingAddress ? 'PUT' : 'POST';
       
@@ -314,7 +315,7 @@ export default function ProfilePage() {
 
     const promise = async () => {
       const token = sessionStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/profile/addresses/${id}`, {
+      const response = await fetch(apiUrl(`/api/profile/addresses/${id}`), {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -334,7 +335,7 @@ export default function ProfilePage() {
   const handleSetPrimaryAddress = async (id: number) => {
     const promise = async () => {
       const token = sessionStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/profile/addresses/${id}/primary`, {
+      const response = await fetch(apiUrl(`/api/profile/addresses/${id}/primary`), {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -363,7 +364,7 @@ export default function ProfilePage() {
 
     const promise = async () => {
       const token = sessionStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/profile/password', {
+      const response = await fetch(apiUrl('/api/profile/password'), {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -434,7 +435,7 @@ export default function ProfilePage() {
               <div className="flex items-center gap-6 mb-6">
                 <div className="relative group">
                   <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
-                    <AvatarImage src={profile.profile_picture ? `http://localhost:5000${profile.profile_picture}` : undefined} />
+                    <AvatarImage src={profile.profile_picture ? apiUrl(`${profile.profile_picture}`) : undefined} />
                     <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
                       {profile.first_name[0]}{profile.last_name[0]}
                     </AvatarFallback>

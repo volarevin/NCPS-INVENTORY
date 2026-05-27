@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiUrl } from '@/config/api';
 import {
   Dialog,
   DialogContent,
@@ -51,7 +52,7 @@ export function CreateAppointmentDialog({ open, onOpenChange, initialServiceId, 
 
   const fetchServices = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/services');
+      const response = await fetch(apiUrl('/api/services'));
       const data = await response.json();
       if (Array.isArray(data)) {
         setServices(data);
@@ -68,7 +69,7 @@ export function CreateAppointmentDialog({ open, onOpenChange, initialServiceId, 
     try {
       const token = sessionStorage.getItem('token');
       if (!token) return;
-      const response = await fetch('http://localhost:5000/api/customer/addresses', {
+      const response = await fetch(apiUrl('/api/customer/addresses'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -111,7 +112,7 @@ export function CreateAppointmentDialog({ open, onOpenChange, initialServiceId, 
         throw new Error('You must be logged in to book an appointment.');
       }
 
-      const response = await fetch('http://localhost:5000/api/appointments', {
+      const response = await fetch(apiUrl('/api/appointments'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

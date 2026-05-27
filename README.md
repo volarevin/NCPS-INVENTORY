@@ -18,7 +18,45 @@ npm install
 
 ### 3. Database Setup
 1. Import the database schema from `system/database/ncps_db.sql` into your MySQL server
-2. Update `system/server/.env` with your database credentials
+2. Copy `system/server/.env.example` to `system/server/.env` and set database credentials
+3. Copy `system/main/.env.example` to `system/main/.env` (defaults to `http://localhost:5000` for local API)
+
+---
+
+## Hostinger / Production Deployment
+
+### Backend env vars (Node app — `system/server`)
+Set in Hostinger **Environment variables** (not only in local `.env`):
+
+| Variable | Example |
+|----------|---------|
+| `DB_HOST` | `mysql123.hostinger.com` (from hPanel, **not** `localhost`) |
+| `DB_USER` | Your MySQL username |
+| `DB_PASSWORD` | Your MySQL password |
+| `DB_NAME` | Your MySQL database name |
+| `JWT_SECRET` | Long random string (required for login) |
+| `NODE_ENV` | `production` |
+
+### Frontend build env (`system/main`)
+Set **`VITE_API_URL`** when building the frontend to your live API URL (no trailing slash):
+
+```
+VITE_API_URL=https://yourdomain.com
+```
+
+Then build and deploy:
+
+```bash
+cd system/main && npm install && npm run build
+cd ../server && npm install && npm start
+```
+
+The server serves `system/main/dist` automatically when that folder exists.
+
+### Health check
+After deploy, visit `https://yourdomain.com/api/health` — should return `{"ok":true,"db":true}`.
+
+If login returns **500**, check Hostinger logs for `Database error` or `JWT_SECRET missing`.
 
 ---
 

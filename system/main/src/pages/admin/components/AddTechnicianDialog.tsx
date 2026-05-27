@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiUrl } from '@/config/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,7 +58,7 @@ export function AddTechnicianDialog({ open, onOpenChange, onTechnicianAdded }: A
   const fetchUsers = async () => {
     try {
       const token = sessionStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/admin/users', {
+      const response = await fetch(apiUrl('/api/admin/users'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -73,7 +74,7 @@ export function AddTechnicianDialog({ open, onOpenChange, onTechnicianAdded }: A
 
     const promise = async () => {
       const token = sessionStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/admin/technicians/promote', {
+      const response = await fetch(apiUrl('/api/admin/technicians/promote'), {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

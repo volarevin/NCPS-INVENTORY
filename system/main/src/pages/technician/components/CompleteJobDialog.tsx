@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { apiUrl } from '@/config/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +45,7 @@ export function CompleteJobDialog({ isOpen, onClose, onConfirm, serviceName, ser
       try {
         setItemsLoading(true);
         const token = sessionStorage.getItem('token');
-        const response = await fetch('http://localhost:5000/api/inventory/items', {
+        const response = await fetch(apiUrl('/api/inventory/items'), {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (response.ok) {

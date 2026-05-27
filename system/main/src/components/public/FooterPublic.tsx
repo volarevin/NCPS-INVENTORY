@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { apiUrl } from '@/config/api';
 import { Facebook, Twitter, Instagram, Mail, Phone, MapPin } from 'lucide-react';
 
 export function FooterPublic() {
@@ -11,7 +12,7 @@ export function FooterPublic() {
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 bg-white rounded-full flex items-center justify-center shadow-sm p-1">
                 <img 
-                  src="http://localhost:5000/uploads/logo/ncps.png" 
+                  src={apiUrl("/uploads/logo/ncps.png")} 
                   alt="NCPS Logo" 
                   className="h-full w-full object-contain"
                 />

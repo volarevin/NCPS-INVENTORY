@@ -14,6 +14,7 @@ import { PageHeader } from './PageHeader';
 import { useNavigate } from 'react-router-dom';
 import { useFeedback } from "@/context/FeedbackContext";
 import { getProfilePictureUrl } from "@/lib/utils";
+import { apiUrl } from '@/config/api';
 
 type AppointmentStatus = 'all' | 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'rejected';
 type ViewMode = 'list' | 'calendar';
@@ -45,7 +46,7 @@ export function CustomerAppointments() {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/api/customer/appointments', {
+      const response = await fetch(apiUrl('/api/customer/appointments'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -101,7 +102,7 @@ export function CustomerAppointments() {
     if (!selectedAppointment) return;
 
     const promise = async () => {
-      const response = await fetch(`http://localhost:5000/api/appointments/${selectedAppointment.id}/status`, {
+      const response = await fetch(apiUrl(`/api/appointments/${selectedAppointment.id}/status`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

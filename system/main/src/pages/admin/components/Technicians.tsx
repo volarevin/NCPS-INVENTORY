@@ -33,6 +33,7 @@ import { AddTechnicianDialog, SPECIALTIES } from "./AddTechnicianDialog";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { useFeedback } from "@/context/FeedbackContext";
 import { getProfilePictureUrl } from "@/lib/utils";
+import { apiUrl } from '@/config/api';
 
 interface Technician {
   id: string;
@@ -87,7 +88,7 @@ export function Technicians() {
       const token = sessionStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('http://localhost:5000/api/admin/technicians', {
+      const response = await fetch(apiUrl('/api/admin/technicians'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -131,7 +132,7 @@ export function Technicians() {
         const token = sessionStorage.getItem('token');
         if (!token) return;
 
-        const response = await fetch(`http://localhost:5000/api/admin/technicians/${techId}`, {
+        const response = await fetch(apiUrl(`/api/admin/technicians/${techId}`), {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
@@ -153,7 +154,7 @@ export function Technicians() {
       const token = sessionStorage.getItem('token');
       if (!token) return;
       
-      const response = await fetch(`http://localhost:5000/api/admin/appointments/${appointmentId}`, {
+      const response = await fetch(apiUrl(`/api/admin/appointments/${appointmentId}`), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -174,7 +175,7 @@ export function Technicians() {
       onConfirm: async () => {
         const promise = async () => {
             const token = sessionStorage.getItem('token');
-            const response = await fetch(`http://localhost:5000/api/admin/technicians/${id}/status`, {
+            const response = await fetch(apiUrl(`/api/admin/technicians/${id}/status`), {
                 method: 'PUT',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -210,7 +211,7 @@ export function Technicians() {
       onConfirm: async () => {
         const promise = async () => {
             const token = sessionStorage.getItem('token');
-            const response = await fetch(`http://localhost:5000/api/admin/technicians/${id}/status`, {
+            const response = await fetch(apiUrl(`/api/admin/technicians/${id}/status`), {
                 method: 'PUT',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -239,7 +240,7 @@ export function Technicians() {
     const handleEdit = async (id: number, data: any) => {
     const promise = async () => {
       const token = sessionStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/admin/technicians/${id}/profile`, {
+      const response = await fetch(apiUrl(`/api/admin/technicians/${id}/profile`), {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',

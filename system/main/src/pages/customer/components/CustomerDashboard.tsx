@@ -1,3 +1,4 @@
+import { apiUrl } from '@/config/api';
 import { 
   Calendar, Clock, Wrench, CheckCircle2, Plus, Bell
 } from 'lucide-react';
@@ -49,7 +50,7 @@ export function CustomerDashboard() {
         const headers = { 'Authorization': `Bearer ${token}` };
 
         // Fetch Stats
-        const statsRes = await fetch('http://localhost:5000/api/customer/stats', { headers });
+        const statsRes = await fetch(apiUrl('/api/customer/stats'), { headers });
         
         if (statsRes.status === 401) {
           sessionStorage.removeItem('token');
@@ -62,7 +63,7 @@ export function CustomerDashboard() {
         setDashboardStats(statsData);
 
         // Fetch Appointments
-        const apptRes = await fetch('http://localhost:5000/api/customer/appointments', { headers });
+        const apptRes = await fetch(apiUrl('/api/customer/appointments'), { headers });
         
         if (apptRes.status === 401) {
           sessionStorage.removeItem('token');
@@ -142,7 +143,7 @@ export function CustomerDashboard() {
         }
 
         // Fetch Notifications
-        const notifRes = await fetch('http://localhost:5000/api/customer/notifications', { headers });
+        const notifRes = await fetch(apiUrl('/api/customer/notifications'), { headers });
         if (notifRes.ok) {
             const notifData = await notifRes.json();
             // Ensure we are not setting stale data if a delete happened concurrently
@@ -157,7 +158,7 @@ export function CustomerDashboard() {
         }
 
         // Fetch Featured Services
-        const servicesRes = await fetch('http://localhost:5000/api/customer/featured-services', { headers });
+        const servicesRes = await fetch(apiUrl('/api/customer/featured-services'), { headers });
         if (servicesRes.ok) {
             const servicesData = await servicesRes.json();
             setFeaturedServices(servicesData);
@@ -246,7 +247,7 @@ export function CustomerDashboard() {
     e.stopPropagation();
     try {
         const token = sessionStorage.getItem('token');
-        await fetch(`http://localhost:5000/api/customer/notifications/${id}`, {
+        await fetch(apiUrl(`/api/customer/notifications/${id}`), {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -259,7 +260,7 @@ export function CustomerDashboard() {
   const handleClearAllNotifications = async () => {
     try {
         const token = sessionStorage.getItem('token');
-        const res = await fetch('http://localhost:5000/api/customer/notifications', {
+        const res = await fetch(apiUrl('/api/customer/notifications'), {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { apiUrl } from '@/config/api';
 import {
   Dialog,
   DialogContent,
@@ -42,7 +43,7 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
 
     try {
       const token = sessionStorage.getItem("token");
-      const response = await fetch("http://localhost:5000/api/admin/users", {
+      const response = await fetch(apiUrl("/api/admin/users"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -10,6 +10,7 @@ import { useFeedback } from "@/context/FeedbackContext";
 import { Search, User, Calendar, MapPin, AlertTriangle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getProfilePictureUrl } from "@/lib/utils";
+import { apiUrl } from '@/config/api';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -77,9 +78,9 @@ export function CreateWalkInDialog({ open, onOpenChange, onSuccess }: CreateWalk
     const userStr = sessionStorage.getItem('user');
     if (userStr) {
       const user = JSON.parse(userStr);
-      if (user.role === 'Receptionist') return 'http://localhost:5000/api/receptionist';
+      if (user.role === 'Receptionist') return apiUrl('/api/receptionist');
     }
-    return 'http://localhost:5000/api/admin';
+    return apiUrl('/api/admin');
   };
 
   useEffect(() => {
@@ -203,7 +204,7 @@ export function CreateWalkInDialog({ open, onOpenChange, onSuccess }: CreateWalk
     }
 
     const promise = async () => {
-      const response = await fetch('http://localhost:5000/api/appointments/walkin', {
+      const response = await fetch(apiUrl('/api/appointments/walkin'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -77,6 +77,11 @@ exports.login = (req, res) => {
 
     const user = results[0];
 
+    if (!process.env.JWT_SECRET) {
+      console.error('JWT_SECRET is not set');
+      return res.status(500).json({ message: 'Server misconfiguration: JWT_SECRET missing.' });
+    }
+
     // Check password
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {

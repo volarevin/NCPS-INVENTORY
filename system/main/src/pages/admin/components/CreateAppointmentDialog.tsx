@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiUrl } from '@/config/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,7 +70,7 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
         
         try {
           const token = sessionStorage.getItem('token');
-          const response = await fetch('http://localhost:5000/api/admin/appointments/check-conflict', {
+          const response = await fetch(apiUrl('/api/admin/appointments/check-conflict'), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -106,9 +107,9 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
     try {
       const token = sessionStorage.getItem('token');
       const [usersRes, servicesRes, techsRes] = await Promise.all([
-        fetch('http://localhost:5000/api/admin/users', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('http://localhost:5000/api/admin/services', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('http://localhost:5000/api/admin/users?role=Technician', { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch(apiUrl('/api/admin/users'), { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(apiUrl('/api/admin/services'), { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(apiUrl('/api/admin/users?role=Technician'), { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
 
       const usersData = await usersRes.json();
@@ -136,7 +137,7 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
       // Combine date and time
       const dateTime = new Date(`${formData.appointment_date}T${formData.time}`);
       
-      const response = await fetch('http://localhost:5000/api/admin/appointments', {
+      const response = await fetch(apiUrl('/api/admin/appointments'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiUrl } from '@/config/api';
 import { User, Mail, Phone, MapPin, Lock, Trash2, Save } from 'lucide-react';
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
@@ -48,7 +49,7 @@ export function CustomerProfile() {
       const token = sessionStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('http://localhost:5000/api/customer/profile', {
+      const response = await fetch(apiUrl('/api/customer/profile'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -79,7 +80,7 @@ export function CustomerProfile() {
       const token = sessionStorage.getItem('token');
       if (!token) throw new Error("No token found");
 
-      const response = await fetch('http://localhost:5000/api/customer/profile', {
+      const response = await fetch(apiUrl('/api/customer/profile'), {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -113,7 +114,7 @@ export function CustomerProfile() {
       const token = sessionStorage.getItem('token');
       if (!token) throw new Error("No token found");
 
-      const response = await fetch('http://localhost:5000/api/customer/change-password', {
+      const response = await fetch(apiUrl('/api/customer/change-password'), {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -146,7 +147,7 @@ export function CustomerProfile() {
       const token = sessionStorage.getItem('token');
       if (!token) throw new Error("No token found");
 
-      const response = await fetch('http://localhost:5000/api/customer/account', {
+      const response = await fetch(apiUrl('/api/customer/account'), {
         method: 'DELETE',
         headers: { 
           'Authorization': `Bearer ${token}` 

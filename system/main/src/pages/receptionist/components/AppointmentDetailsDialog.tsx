@@ -1,3 +1,4 @@
+import { apiUrl } from '@/config/api';
 import {
   Dialog,
   DialogContent,
@@ -124,7 +125,7 @@ export function AppointmentDetailsDialog({
           const token = sessionStorage.getItem('token');
           let currentServiceId = appointment.serviceId;
           
-          const response = await fetch('http://localhost:5000/api/receptionist/appointments/check-conflict', {
+          const response = await fetch(apiUrl('/api/receptionist/appointments/check-conflict'), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -161,7 +162,7 @@ export function AppointmentDetailsDialog({
   const fetchTechnicians = async () => {
     try {
       const token = sessionStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/receptionist/technicians', {
+      const response = await fetch(apiUrl('/api/receptionist/technicians'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();

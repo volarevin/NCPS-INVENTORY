@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Menu, X, LogIn, UserPlus, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { apiUrl } from '@/config/api';
 
 export function NavbarPublic() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -60,7 +61,7 @@ export function NavbarPublic() {
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
           <div className="relative h-16 w-16 flex items-center justify-center bg-white/90 rounded-full shadow-sm p-1">
             <img 
-              src="http://localhost:5000/uploads/logo/ncps.png" 
+              src={apiUrl("/uploads/logo/ncps.png")} 
               alt="NCPS Logo" 
               className="h-full w-full object-contain"
               onError={(e) => {

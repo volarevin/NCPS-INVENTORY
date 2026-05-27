@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
+import { apiUrl } from '@/config/api';
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -8,5 +9,5 @@ export function cn(...inputs: ClassValue[]) {
 export function getProfilePictureUrl(path: string | null | undefined) {
   if (!path) return undefined;
   if (path.startsWith('http')) return path;
-  return `http://localhost:5000${path}`;
+  return apiUrl(`${path}`);
 }

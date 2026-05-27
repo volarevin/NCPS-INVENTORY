@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiUrl } from '@/config/api';
 import {
   Dialog,
   DialogContent,
@@ -75,7 +76,7 @@ export function EditAppointmentDialog({ open, onOpenChange, appointment }: EditA
 
   const fetchServices = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/services');
+      const response = await fetch(apiUrl('/api/services'));
       const data = await response.json();
       if (Array.isArray(data)) {
         setServices(data);
@@ -90,7 +91,7 @@ export function EditAppointmentDialog({ open, onOpenChange, appointment }: EditA
     
     const promise = async () => {
       const token = sessionStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/appointments/${appointment.id}`, {
+      const response = await fetch(apiUrl(`/api/appointments/${appointment.id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

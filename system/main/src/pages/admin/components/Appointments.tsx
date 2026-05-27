@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/context/FeedbackContext";
 // import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getProfilePictureUrl } from "@/lib/utils";
+import { apiUrl } from '@/config/api';
 import { iconMap } from "./CategorySettingsDialog";
 
 interface Appointment {
@@ -95,7 +96,7 @@ export function Appointments() {
         navigate('/login');
         return;
       }
-      const response = await fetch('http://localhost:5000/api/admin/categories', {
+      const response = await fetch(apiUrl('/api/admin/categories'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -122,7 +123,7 @@ export function Appointments() {
           navigate('/login');
           return;
         }
-        const response = await fetch('http://localhost:5000/api/admin/appointments/recycle-bin/count', {
+        const response = await fetch(apiUrl('/api/admin/appointments/recycle-bin/count'), {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -148,7 +149,7 @@ export function Appointments() {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/api/admin/appointments', {
+      const response = await fetch(apiUrl('/api/admin/appointments'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -293,7 +294,7 @@ export function Appointments() {
 
         const ids = filteredAppointments.map(a => a.id);
 
-        const response = await fetch('http://localhost:5000/api/admin/appointments/bulk-delete', {
+        const response = await fetch(apiUrl('/api/admin/appointments/bulk-delete'), {
             method: 'POST',
             headers: { 
                 'Authorization': `Bearer ${token}`,
@@ -321,7 +322,7 @@ export function Appointments() {
     if (!token) return;
 
     const promise = async () => {
-      const response = await fetch(`http://localhost:5000/api/admin/appointments/${id}/details`, {
+      const response = await fetch(apiUrl(`/api/admin/appointments/${id}/details`), {
         method: 'PUT',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -352,7 +353,7 @@ export function Appointments() {
     const promise = async () => {
         // If deleting (soft delete)
         if (newStatus === 'deleted') {
-             const response = await fetch(`http://localhost:5000/api/admin/appointments/${id}`, {
+             const response = await fetch(apiUrl(`/api/admin/appointments/${id}`), {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -377,7 +378,7 @@ export function Appointments() {
             if (arg4) body.category = arg4;
         }
 
-        const response = await fetch(`http://localhost:5000/api/admin/appointments/${id}/status`, {
+        const response = await fetch(apiUrl(`/api/admin/appointments/${id}/status`), {
             method: 'PUT',
             headers: { 
                 'Authorization': `Bearer ${token}`,

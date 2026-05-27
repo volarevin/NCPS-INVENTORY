@@ -28,6 +28,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { getProfilePictureUrl } from "@/lib/utils";
+import { apiUrl } from '@/config/api';
 import { useNavigate } from "react-router-dom";
 
 const COLORS = ['#60A5FA', '#34D399', '#F472B6', '#FBBF24', '#A78BFA', '#22D3EE', '#F87171', '#10B981'];
@@ -138,7 +139,7 @@ export function Reports({ onNavigate }: { onNavigate?: (tab: string) => void }) 
       if (dateRange.start) queryParams.append('startDate', dateRange.start);
       if (dateRange.end) queryParams.append('endDate', dateRange.end);
 
-      const response = await fetch(`http://localhost:5000/api/admin/reports?${queryParams}`, {
+      const response = await fetch(apiUrl(`/api/admin/reports?${queryParams}`), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -183,7 +184,7 @@ export function Reports({ onNavigate }: { onNavigate?: (tab: string) => void }) 
         (!data.summary || Number(data.summary.total) === 0) &&
         (!Array.isArray(data.monthly) || data.monthly.length === 0)
       ) {
-        const fallbackResponse = await fetch('http://localhost:5000/api/admin/reports', {
+        const fallbackResponse = await fetch(apiUrl('/api/admin/reports'), {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -220,7 +221,7 @@ export function Reports({ onNavigate }: { onNavigate?: (tab: string) => void }) 
       if (dateRange.start) queryParams.append('startDate', dateRange.start);
       if (dateRange.end) queryParams.append('endDate', dateRange.end);
 
-      const response = await fetch(`http://localhost:5000/api/admin/reports/export?${queryParams}`, {
+      const response = await fetch(apiUrl(`/api/admin/reports/export?${queryParams}`), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 

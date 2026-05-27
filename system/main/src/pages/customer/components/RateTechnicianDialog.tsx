@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiUrl } from '@/config/api';
 import {
   Dialog,
   DialogContent,
@@ -36,7 +37,7 @@ export function RateTechnicianDialog({ open, onOpenChange, appointment }: RateTe
         throw new Error('You must be logged in');
       }
 
-      const response = await fetch(`http://localhost:5000/api/appointments/${appointment.id}/rate`, {
+      const response = await fetch(apiUrl(`/api/appointments/${appointment.id}/rate`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

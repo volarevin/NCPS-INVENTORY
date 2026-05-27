@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { apiUrl } from '@/config/api';
 import { useNavigate } from "react-router-dom";
 import { ArrowUpDown, Image as ImageIcon, Pencil, Plus, Search } from "lucide-react";
 import { PageHeader } from "./PageHeader";
@@ -110,7 +111,7 @@ export function Inventory() {
     }
 
     const promise = async () => {
-      const response = await fetch(`http://localhost:5000/api/inventory/items/${id}/delete`, {
+      const response = await fetch(apiUrl(`/api/inventory/items/${id}/delete`), {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -150,7 +151,7 @@ export function Inventory() {
     try {
       const token = sessionStorage.getItem("token");
       if (!token) return;
-      const response = await fetch("http://localhost:5000/api/inventory/categories", {
+      const response = await fetch(apiUrl("/api/inventory/categories"), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) return;
@@ -170,7 +171,7 @@ export function Inventory() {
         return;
       }
 
-      const response = await fetch("http://localhost:5000/api/inventory/items", {
+      const response = await fetch(apiUrl("/api/inventory/items"), {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -278,8 +279,8 @@ export function Inventory() {
     const promise = async () => {
       const response = await fetch(
         selectedItem
-          ? `http://localhost:5000/api/inventory/items/${selectedItem.item_id}`
-          : "http://localhost:5000/api/inventory/items",
+          ? apiUrl(`/api/inventory/items/${selectedItem.item_id}`)
+          : apiUrl("/api/inventory/items"),
         {
           method: selectedItem ? "PUT" : "POST",
           headers: {
@@ -325,7 +326,7 @@ export function Inventory() {
 
     const promise = async () => {
       const response = await fetch(
-        `http://localhost:5000/api/inventory/items/${selectedItem.item_id}/adjust`,
+        apiUrl(`/api/inventory/items/${selectedItem.item_id}/adjust`),
         {
           method: "POST",
           headers: {
@@ -367,7 +368,7 @@ export function Inventory() {
   const resolveImageUrl = (path?: string | null) => {
     if (!path) return "";
     if (path.startsWith("http")) return path;
-    return `http://localhost:5000${path}`;
+    return apiUrl(`${path}`);
   };
 
   const handleImagePick = (file: File | null) => {

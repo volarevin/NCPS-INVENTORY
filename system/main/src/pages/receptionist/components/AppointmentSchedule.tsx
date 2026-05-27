@@ -13,6 +13,7 @@ import { CreateWalkInDialog } from "../../admin/components/CreateWalkInDialog";
 import { ReceptionistCalendar } from "./ReceptionistCalendar";
 import { LayoutList, Calendar as CalendarIcon, Star } from "lucide-react";
 import { getProfilePictureUrl } from "@/lib/utils";
+import { apiUrl } from '@/config/api';
 import { iconMap } from "../../admin/components/CategorySettingsDialog";
 
 export interface Appointment {
@@ -94,7 +95,7 @@ export function AppointmentSchedule({ selectedAppointmentFromDashboard, onClearS
         navigate('/login');
         return;
       }
-      const response = await fetch('http://localhost:5000/api/receptionist/categories', {
+      const response = await fetch(apiUrl('/api/receptionist/categories'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -128,7 +129,7 @@ export function AppointmentSchedule({ selectedAppointmentFromDashboard, onClearS
         navigate('/login');
         return;
       }
-      const response = await fetch('http://localhost:5000/api/receptionist/appointments/marked-deletion', {
+      const response = await fetch(apiUrl('/api/receptionist/appointments/marked-deletion'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -157,7 +158,7 @@ export function AppointmentSchedule({ selectedAppointmentFromDashboard, onClearS
         navigate('/login');
         return;
       }
-      const response = await fetch('http://localhost:5000/api/receptionist/appointments', {
+      const response = await fetch(apiUrl('/api/receptionist/appointments'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -199,7 +200,7 @@ export function AppointmentSchedule({ selectedAppointmentFromDashboard, onClearS
     if (!token) return;
 
     const promise = async () => {
-      const response = await fetch(`http://localhost:5000/api/receptionist/appointments/${id}/details`, {
+      const response = await fetch(apiUrl(`/api/receptionist/appointments/${id}/details`), {
         method: 'PUT',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -229,7 +230,7 @@ export function AppointmentSchedule({ selectedAppointmentFromDashboard, onClearS
 
     const promise = async () => {
       if (status === 'deleted') {
-        const response = await fetch(`http://localhost:5000/api/receptionist/appointments/${id}/soft`, {
+        const response = await fetch(apiUrl(`/api/receptionist/appointments/${id}/soft`), {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -249,7 +250,7 @@ export function AppointmentSchedule({ selectedAppointmentFromDashboard, onClearS
             if (arg4) body.category = arg4;
         }
 
-        const response = await fetch(`http://localhost:5000/api/receptionist/appointments/${id}/status`, {
+        const response = await fetch(apiUrl(`/api/receptionist/appointments/${id}/status`), {
           method: 'PUT',
           headers: { 
             'Content-Type': 'application/json',
@@ -283,7 +284,7 @@ export function AppointmentSchedule({ selectedAppointmentFromDashboard, onClearS
     const promise = async () => {
       const token = sessionStorage.getItem('token');
       await Promise.all(filteredAppointments.map(apt => 
-        fetch(`http://localhost:5000/api/receptionist/appointments/${apt.id}/soft`, {
+        fetch(apiUrl(`/api/receptionist/appointments/${apt.id}/soft`), {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         })

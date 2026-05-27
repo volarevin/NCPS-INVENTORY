@@ -18,6 +18,7 @@ import { useNavigate } from "react-router-dom";
 import { PageHeader } from "./PageHeader";
 import { Button } from "@/components/ui/button";
 import { getProfilePictureUrl } from "@/lib/utils";
+import { apiUrl } from '@/config/api';
 
 const COLORS = ["#5B8FFF", "#FFB366", "#5DD37C", "#FF6B6B", "#8884d8", "#9CA3AF"]; // Added Gray for Others
 
@@ -46,10 +47,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         const headers = { 'Authorization': `Bearer ${token}` };
 
         const [statsRes, monthlyRes, serviceRes, activityRes] = await Promise.all([
-          fetch('http://localhost:5000/api/admin/stats', { headers }),
-          fetch('http://localhost:5000/api/admin/monthly-stats', { headers }),
-          fetch('http://localhost:5000/api/admin/service-distribution', { headers }),
-          fetch('http://localhost:5000/api/admin/recent-activity', { headers })
+          fetch(apiUrl('/api/admin/stats'), { headers }),
+          fetch(apiUrl('/api/admin/monthly-stats'), { headers }),
+          fetch(apiUrl('/api/admin/service-distribution'), { headers }),
+          fetch(apiUrl('/api/admin/recent-activity'), { headers })
         ]);
 
         const responses = [statsRes, monthlyRes, serviceRes, activityRes];
