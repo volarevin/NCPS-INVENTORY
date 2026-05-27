@@ -35,13 +35,13 @@ exports.getDashboardStats = (req, res) => {
   console.log('getDashboardStats called');
   const query = `
     SELECT 
-      (SELECT COUNT(*) FROM appointments WHERE DATE(appointment_date) = (SELECT MAX(DATE(appointment_date)) FROM appointments)) AS today_appointments,
+      (SELECT COUNT(*) FROM appointments WHERE DATE(appointment_date) = CURDATE()) AS today_appointments,
       (SELECT COUNT(*) FROM appointments WHERE status = 'Pending') AS pending_requests,
       (SELECT COUNT(*) FROM appointments WHERE status = 'In Progress') AS in_progress_count,
       (SELECT COUNT(*) FROM technician_profiles WHERE availability_status = 'Available') AS available_techs,
       (SELECT COALESCE(SUM(CASE WHEN a.status = 'Completed' THEN COALESCE(a.total_cost, s.estimated_price) ELSE 0 END), 0) 
        FROM appointments a JOIN services s ON a.service_id = s.service_id 
-       WHERE MONTH(a.appointment_date) = MONTH((SELECT MAX(appointment_date) FROM appointments)) AND YEAR(a.appointment_date) = YEAR((SELECT MAX(appointment_date) FROM appointments))) AS monthly_revenue,
+       WHERE MONTH(a.appointment_date) = MONTH(CURDATE()) AND YEAR(a.appointment_date) = YEAR(CURDATE())) AS monthly_revenue,
       (SELECT COALESCE(SUM(CASE WHEN a.status = 'Completed' THEN COALESCE(a.total_cost, s.estimated_price) ELSE 0 END), 0) 
        FROM appointments a JOIN services s ON a.service_id = s.service_id) as actual_revenue,
       (SELECT COALESCE(SUM(CASE WHEN a.status IN ('Pending', 'Confirmed') AND a.total_cost IS NULL THEN s.estimated_price ELSE 0 END), 0) 
@@ -116,7 +116,7 @@ exports.getMonthlyStats = (req, res) => {
     FROM appointments a
     JOIN services s ON a.service_id = s.service_id
     WHERE a.appointment_date >= DATE_SUB(
-      (SELECT COALESCE(MAX(appointment_date), NOW()) FROM appointments),
+      NOW(),
       INTERVAL 10 MONTH
     )
     GROUP BY DATE_FORMAT(a.appointment_date, '%Y-%m') 
@@ -255,7 +255,7 @@ exports.getReportsData = (req, res) => {
           COALESCE(SUM(CASE WHEN a.status = 'Completed' THEN COALESCE(a.total_cost, s.estimated_price) ELSE 0 END), 0) as revenue
       FROM appointments a
       JOIN services s ON a.service_id = s.service_id
-      ${dateWhere || "WHERE a.appointment_date >= DATE_SUB((SELECT COALESCE(MAX(appointment_date), NOW()) FROM appointments), INTERVAL 12 MONTH)"}
+      ${dateWhere || "WHERE a.appointment_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)"}
       GROUP BY DATE_FORMAT(a.appointment_date, '%Y-%m')
       ORDER BY DATE_FORMAT(a.appointment_date, '%Y-%m')
     `,
@@ -394,7 +394,7 @@ exports.exportDetailedReports = (req, res) => {
     monthlyWhere = "WHERE a.appointment_date <= ?";
     queryParams = [endBound];
   } else {
-    monthlyWhere = "WHERE a.appointment_date >= DATE_SUB((SELECT COALESCE(MAX(appointment_date), NOW()) FROM appointments), INTERVAL 12 MONTH)";
+    monthlyWhere = "WHERE a.appointment_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)";
   }
 
   const queries = {
