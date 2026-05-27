@@ -4,7 +4,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../../components/ui/dialog";
-import { Calendar, Clock, MapPin, User, Phone, Mail, FileText, Check, Circle } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Phone, Mail, FileText, Check, Circle, Wrench } from 'lucide-react';
 import { Button } from "../../../components/ui/button";
 import { useState, useEffect } from 'react';
 import {
@@ -88,6 +88,12 @@ export function ViewAppointmentDialog({ open, onOpenChange, appointment, onEdit,
 
   const currentStepIndex = steps.findIndex(step => step.id === appointment.status);
   const isCancelled = appointment.status === 'cancelled';
+  const isCompleted = appointment.status === 'completed';
+
+  const baseCost = Number(appointment.servicePrice ?? appointment.baseCost ?? appointment.base_price ?? 0);
+  const extraCost = Number(appointment.additionalCost ?? appointment.extraCost ?? 0);
+  const computedTotal = baseCost + partsSubtotal + (Number.isFinite(extraCost) ? extraCost : 0);
+  const totalCost = Number(appointment.totalCost ?? computedTotal);
 
   const handleEdit = () => {
     if (onEdit) {
@@ -105,17 +111,18 @@ export function ViewAppointmentDialog({ open, onOpenChange, appointment, onEdit,
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-[#1A5560]">Appointment Details</DialogTitle>
-            <span className={`${statusColors[appointment.status]} text-white px-3 py-1 rounded-full text-sm`}>
-              {statusLabels[appointment.status]}
-            </span>
-          </div>
-        </DialogHeader>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden">
+        <div className="max-h-[calc(85vh-3rem)] overflow-y-auto pr-1">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-[#1A5560]">Appointment Details</DialogTitle>
+              <span className={`${statusColors[appointment.status]} text-white px-3 py-1 rounded-full text-sm`}>
+                {statusLabels[appointment.status]}
+              </span>
+            </div>
+          </DialogHeader>
 
-        <div className="space-y-4 mt-2">
+          <div className="space-y-4 mt-2">
           {/* Order Status Stepper */}
           {!isCancelled && (
             <div className="relative flex items-center justify-between w-full px-2 mb-6">
@@ -255,6 +262,100 @@ export function ViewAppointmentDialog({ open, onOpenChange, appointment, onEdit,
             </div>
           </div>
 
+          {/* Parts Used & Cost Summary */}
+          {isCompleted && (
+            <div className="space-y-3">
+              <h3 className="text-[#1A5560] mb-1 text-sm font-semibold flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-[#3FA9BC]" /> Parts Used
+              </h3>
+              <div className="rounded-lg border border-gray-200 bg-white">
+                <div className="hidden sm:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Item</TableHead>
+                        <TableHead>Qty</TableHead>
+                        <TableHead>Unit Price</TableHead>
+                        <TableHead className="text-right">Line Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {partsLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="h-16 text-center">Loading parts...</TableCell>
+                        </TableRow>
+                      ) : parts.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="h-16 text-center">No parts logged for this appointment.</TableCell>
+                        </TableRow>
+                      ) : (
+                        parts.map((part) => {
+                          const lineTotal = Number(part.line_total) || (Number(part.unit_price) || 0) * (Number(part.quantity) || 0);
+                          return (
+                            <TableRow key={`${part.item_id}-${part.name}`}>
+                              <TableCell className="font-medium">{part.name}</TableCell>
+                              <TableCell>{part.quantity} {part.unit}</TableCell>
+                              <TableCell>{formatMoney(part.unit_price)}</TableCell>
+                              <TableCell className="text-right">{formatMoney(lineTotal)}</TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="sm:hidden">
+                  {partsLoading ? (
+                    <div className="px-4 py-6 text-center text-sm text-[#1A5560]/70">Loading parts...</div>
+                  ) : parts.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-sm text-[#1A5560]/70">No parts logged for this appointment.</div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {parts.map((part) => {
+                        const lineTotal = Number(part.line_total) || (Number(part.unit_price) || 0) * (Number(part.quantity) || 0);
+                        return (
+                          <div key={`${part.item_id}-${part.name}`} className="px-4 py-3 space-y-1">
+                            <div className="text-sm font-semibold text-[#1A5560]">{part.name}</div>
+                            <div className="flex items-center justify-between text-xs text-[#1A5560]/70">
+                              <span>Qty</span>
+                              <span>{part.quantity} {part.unit}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-[#1A5560]/70">
+                              <span>Unit price</span>
+                              <span>{formatMoney(part.unit_price)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs font-medium text-[#1A5560]">
+                              <span>Line total</span>
+                              <span>{formatMoney(lineTotal)}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div className="border-t border-gray-100 px-4 py-3 space-y-1 text-sm">
+                  <div className="flex items-center justify-between text-[#1A5560]/70">
+                    <span>Service base</span>
+                    <span>{formatMoney(baseCost)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[#1A5560]/70">
+                    <span>Parts subtotal</span>
+                    <span>{formatMoney(partsSubtotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[#1A5560]/70">
+                    <span>Additional cost</span>
+                    <span>{formatMoney(Number.isFinite(extraCost) ? extraCost : 0)}</span>
+                  </div>
+                  <div className="flex items-center justify-between font-semibold text-[#1A5560]">
+                    <span>Total cost</span>
+                    <span>{formatMoney(Number.isFinite(totalCost) ? totalCost : computedTotal)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex gap-3 pt-2">
             {(appointment.status === 'pending' || appointment.status === 'confirmed') && (
@@ -274,6 +375,7 @@ export function ViewAppointmentDialog({ open, onOpenChange, appointment, onEdit,
                 </Button>
               </>
             )}
+          </div>
           </div>
         </div>
       </DialogContent>

@@ -81,6 +81,10 @@ export function CustomerAppointments() {
         technicianAvatar: getProfilePictureUrl(appt.tech_profile_picture),
         address: appt.service_address || 'No address provided',
         notes: appt.customer_notes,
+        servicePrice: appt.service_price ?? appt.base_price ?? appt.estimated_price ?? appt.price ?? 0,
+        additionalCost: appt.additional_cost ?? appt.extra_cost ?? 0,
+        totalCost: appt.total_cost ?? appt.totalCost ?? null,
+        costNotes: appt.cost_notes ?? appt.costNotes ?? '',
         rating: appt.rating,
         feedback: appt.feedback_text
       }));

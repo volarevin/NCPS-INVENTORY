@@ -235,6 +235,10 @@ export function CustomerDashboard() {
                 address: appt.service_address || 'No address provided',
                 notes: appt.customer_notes || 'No notes provided.',
                 description: appt.customer_notes,
+              servicePrice: appt.service_price ?? appt.base_price ?? appt.estimated_price ?? appt.price ?? 0,
+              additionalCost: appt.additional_cost ?? appt.extra_cost ?? 0,
+              totalCost: appt.total_cost ?? appt.totalCost ?? null,
+              costNotes: appt.cost_notes ?? appt.costNotes ?? '',
             };
             setSelectedAppointment(formattedAppt);
             setIsViewDialogOpen(true);

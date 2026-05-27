@@ -24,6 +24,8 @@ import {
   XCircle,
   Activity,
   Star,
+  Boxes,
+  AlertTriangle,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -37,6 +39,14 @@ const MONTH_LABELS = [
 ];
 
 const asArray = (value: any) => (Array.isArray(value) ? value : []);
+
+const toNumber = (value: unknown, fallback = 0) => {
+  const normalized =
+    typeof value === "string"
+      ? Number(value.replace(/,/g, "").trim())
+      : Number(value);
+  return Number.isFinite(normalized) ? normalized : fallback;
+};
 
 function parseMonthLabel(label: string) {
   // Handle format: "2025-05"
@@ -112,6 +122,7 @@ export function Reports({ onNavigate }: { onNavigate?: (tab: string) => void }) 
     combinedRevenue: 0,
     avgPerAppointment: 0
   });
+  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState(getCurrentMonthRange());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasAutoAdjustedRange, setHasAutoAdjustedRange] = useState(false);
@@ -176,6 +187,14 @@ export function Reports({ onNavigate }: { onNavigate?: (tab: string) => void }) 
         avgPerAppointment: 0
       });
 
+      const inventoryResponse = await fetch('http://localhost:5000/api/inventory/items', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (inventoryResponse.ok) {
+        const inventoryData = await inventoryResponse.json();
+        setInventoryItems(Array.isArray(inventoryData) ? inventoryData : []);
+      }
+
       if (
         !hasAutoAdjustedRange &&
         dateRange.start === getCurrentMonthRange().start &&
@@ -210,6 +229,67 @@ export function Reports({ onNavigate }: { onNavigate?: (tab: string) => void }) 
       setIsRefreshing(false);
     }
   };
+
+  const inventorySummary = inventoryItems.reduce(
+    (acc, item) => {
+      const qty = toNumber(item.quantity_on_hand || 0);
+      const unitCost = toNumber(item.unit_cost || 0);
+      const unitPrice = toNumber(item.unit_price || 0);
+      const value = qty * unitCost;
+      const retailValue = qty * unitPrice;
+      const category = item.category_name || "Uncategorized";
+      const reorderLevel = toNumber(item.reorder_level || 0);
+      const lowStock = reorderLevel > 0 && qty <= reorderLevel;
+
+      acc.totalItems += 1;
+      acc.totalUnits += qty;
+      acc.totalValue += value;
+      acc.totalRetailValue += retailValue;
+      if (!item.is_active) acc.inactiveItems += 1;
+      if (lowStock) acc.lowStockItems += 1;
+
+      acc.categoryTotals[category] = (acc.categoryTotals[category] || 0) + qty;
+      acc.categoryValue[category] = (acc.categoryValue[category] || 0) + value;
+
+      acc.itemValues.push({
+        name: item.name,
+        value,
+        retailValue,
+        qty,
+      });
+
+      return acc;
+    },
+    {
+      totalItems: 0,
+      totalUnits: 0,
+      totalValue: 0,
+      totalRetailValue: 0,
+      inactiveItems: 0,
+      lowStockItems: 0,
+      categoryTotals: {} as Record<string, number>,
+      categoryValue: {} as Record<string, number>,
+      itemValues: [] as Array<{ name: string; value: number; retailValue: number; qty: number }>,
+    }
+  );
+
+  const inventoryByCategory = Object.entries(inventorySummary.categoryTotals).map(
+    ([name, qty], index) => ({
+      name,
+      qty,
+      value: inventorySummary.categoryValue[name] || 0,
+      fill: COLORS[index % COLORS.length]
+    })
+  );
+
+  const inventoryTopValue = [...inventorySummary.itemValues]
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
+
+  const inventoryStockStatus = [
+    { label: "Low Stock", count: inventorySummary.lowStockItems, color: "#F97316" },
+    { label: "In Stock", count: Math.max(inventorySummary.totalItems - inventorySummary.lowStockItems, 0), color: "#22C55E" },
+  ];
 
   const handleExport = async () => {
     try {
@@ -308,6 +388,7 @@ export function Reports({ onNavigate }: { onNavigate?: (tab: string) => void }) 
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
           <TabsTrigger value="trends">Trends</TabsTrigger>
+          <TabsTrigger value="inventory">Inventory</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -537,6 +618,127 @@ export function Reports({ onNavigate }: { onNavigate?: (tab: string) => void }) 
                   </PieChart>
                 </ResponsiveContainer>
               </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Inventory Reports Tab */}
+        <TabsContent value="inventory" className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard
+              icon={<Boxes className="w-5 h-5" />}
+              label="Items"
+              value={inventorySummary.totalItems}
+              color="#4DBDCC"
+            />
+            <StatCard
+              icon={<Activity className="w-5 h-5" />}
+              label="Units on Hand"
+              value={inventorySummary.totalUnits}
+              color="#3B82F6"
+            />
+            <StatCard
+              icon={<DollarSign className="w-5 h-5" />}
+              label="Stock Cost"
+              value={`₱${(inventorySummary.totalValue / 1000).toFixed(1)}K`}
+              color="#5DD37C"
+            />
+            <StatCard
+              icon={<AlertTriangle className="w-5 h-5" />}
+              label="Low Stock"
+              value={inventorySummary.lowStockItems}
+              color="#F97316"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
+              <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Boxes className="w-5 h-5 text-primary" /> Stock by Category
+              </h3>
+              <div className="h-[320px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={inventoryByCategory} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="hsl(var(--border))" />
+                    <XAxis type="number" hide />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      width={120}
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--popover-foreground))' }}
+                      cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
+                      formatter={(value: any, name: any) =>
+                        name === "qty"
+                          ? [`${Number(value).toLocaleString()}`, "Units"]
+                          : [`₱${Number(value).toLocaleString()}`, "Cost"]
+                      }
+                    />
+                    <Bar dataKey="qty" radius={[0, 4, 4, 0]}>
+                      {inventoryByCategory.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
+              <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-primary" /> Stock Status
+              </h3>
+              <div className="h-[320px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={inventoryStockStatus}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      dataKey="count"
+                      nameKey="label"
+                      labelLine={false}
+                      label={({ percent }: any) => `${(percent * 100).toFixed(0)}%`}
+                    >
+                      {inventoryStockStatus.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--popover-foreground))' }} />
+                    <Legend wrapperStyle={{ color: 'hsl(var(--foreground))' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
+            <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-primary" /> Highest Stock Value Items
+            </h3>
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={inventoryTopValue}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    tickFormatter={(value) => `₱${Number(value) / 1000}k`}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--popover-foreground))' }}
+                    formatter={(value: any) => [`₱${Number(value).toLocaleString()}`, 'Stock Cost']}
+                  />
+                  <Bar dataKey="value" fill="#5B8FFF" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </TabsContent>

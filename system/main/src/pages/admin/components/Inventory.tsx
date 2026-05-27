@@ -16,13 +16,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFeedback } from "@/context/FeedbackContext";
 
@@ -85,6 +85,14 @@ const defaultAdjustForm: AdjustFormState = {
   transactionType: "adjustment",
 };
 
+const toNumber = (value: unknown, fallback = 0) => {
+  const normalized =
+    typeof value === "string"
+      ? Number(value.replace(/,/g, "").trim())
+      : Number(value);
+  return Number.isFinite(normalized) ? normalized : fallback;
+};
+
 export function Inventory() {
   const navigate = useNavigate();
   const { showPromise } = useFeedback();
@@ -93,6 +101,7 @@ export function Inventory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<"create" | "edit">("create");
   const [activeTab, setActiveTab] = useState("details");
@@ -211,17 +220,23 @@ export function Inventory() {
 
   const filteredItems = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return items;
+    const categoryFilter = selectedCategory.toLowerCase();
     return items.filter((item) => {
+      const matchesCategory =
+        categoryFilter === "all" ||
+        (categoryFilter === "uncategorized" && !item.category_name) ||
+        (item.category_name || "").toLowerCase() === categoryFilter;
+      if (!matchesCategory) return false;
+      if (!term) return true;
       return (
         item.name.toLowerCase().includes(term) ||
         (item.sku || "").toLowerCase().includes(term) ||
         (item.category_name || "").toLowerCase().includes(term)
       );
     });
-  }, [items, search]);
+  }, [items, search, selectedCategory]);
 
-  const currentQty = Math.round(Number(selectedItem?.quantity_on_hand ?? 0));
+  const currentQty = Math.round(toNumber(selectedItem?.quantity_on_hand ?? 0));
   const adjustQuantity = Math.round(Number(adjustForm.quantity || 0));
   const normalizedAdjustQty = Number.isFinite(adjustQuantity) ? adjustQuantity : 0;
   const deltaPreview = adjustForm.mode === "remove" ? -Math.abs(normalizedAdjustQty) : Math.abs(normalizedAdjustQty);
@@ -354,7 +369,7 @@ export function Inventory() {
   };
 
   const formatQty = (value: number) => {
-    return Math.round(Number(value || 0)).toLocaleString();
+    return Math.round(toNumber(value || 0)).toLocaleString();
   };
 
   const formatMoney = (value: number) => {
@@ -408,6 +423,33 @@ export function Inventory() {
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant={selectedCategory === "all" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSelectedCategory("all")}
+        >
+          All
+        </Button>
+        <Button
+          variant={selectedCategory === "uncategorized" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSelectedCategory("uncategorized")}
+        >
+          Uncategorized
+        </Button>
+        {categories.map((category) => (
+          <Button
+            key={category.category_id}
+            variant={selectedCategory === category.name ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedCategory(category.name)}
+          >
+            {category.name}
+          </Button>
+        ))}
+      </div>
+
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
@@ -425,7 +467,9 @@ export function Inventory() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filteredItems.map((item) => {
-            const lowStock = item.reorder_level > 0 && item.quantity_on_hand <= item.reorder_level;
+            const qtyOnHand = toNumber(item.quantity_on_hand);
+            const reorderLevel = toNumber(item.reorder_level);
+            const lowStock = reorderLevel > 0 && qtyOnHand <= reorderLevel;
             const imageUrl = resolveImageUrl(item.image_path);
 
             return (
@@ -434,7 +478,7 @@ export function Inventory() {
                 className="group overflow-hidden border-border hover:shadow-lg transition-shadow cursor-pointer"
                 onClick={() => openEditSheet(item)}
               >
-                <div className="h-40 bg-muted/40 flex items-center justify-center overflow-hidden">
+                <div className="h-52 bg-muted/40 flex items-center justify-center overflow-hidden">
                   {imageUrl ? (
                     <img
                       src={imageUrl}
@@ -473,7 +517,7 @@ export function Inventory() {
                       {item.category_name || "Uncategorized"}
                     </span>
                     <span className="rounded-full bg-muted px-2 py-1">
-                      {formatQty(item.quantity_on_hand)} {item.unit}
+                      {formatQty(qtyOnHand)} {item.unit}
                     </span>
                     {lowStock && (
                       <span className="rounded-full bg-orange-50 text-orange-700 px-2 py-1">Low stock</span>
@@ -487,7 +531,7 @@ export function Inventory() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Reorder Level</p>
-                      <p className="font-medium">{formatQty(item.reorder_level)}</p>
+                      <p className="font-medium">{formatQty(reorderLevel)}</p>
                     </div>
                   </div>
 
@@ -522,18 +566,18 @@ export function Inventory() {
         </div>
       )}
 
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="sm:max-w-xl">
-          <SheetHeader>
-            <SheetTitle>
+      <Dialog open={sheetOpen} onOpenChange={setSheetOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
               {sheetMode === "create" ? "Add Inventory Item" : selectedItem?.name || "Inventory Item"}
-            </SheetTitle>
-            <SheetDescription>
+            </DialogTitle>
+            <DialogDescription>
               {sheetMode === "create"
                 ? "Create a new inventory item and set starting stock."
                 : "Update item details and adjust stock."}
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
             <TabsList>
@@ -759,7 +803,7 @@ export function Inventory() {
             </TabsContent>
           </Tabs>
 
-          <SheetFooter className="mt-6">
+          <DialogFooter className="mt-6">
             <Button variant="outline" onClick={() => setSheetOpen(false)}>
               Cancel
             </Button>
@@ -779,9 +823,9 @@ export function Inventory() {
                 Apply Change
               </Button>
             )}
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
