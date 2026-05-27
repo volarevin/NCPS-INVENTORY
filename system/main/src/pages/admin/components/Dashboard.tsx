@@ -1,5 +1,6 @@
 import {
   ComposedChart,
+  BarChart,
   Line,
   Bar,
   PieChart,
@@ -12,7 +13,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Calendar, Wrench, CheckCircle, UserCheck, TrendingUp, Activity, Pencil, Trash } from "lucide-react";
+import { Calendar, Wrench, CheckCircle, UserCheck, TrendingUp, Activity, Pencil, Trash, Boxes, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "./PageHeader";
@@ -22,6 +23,13 @@ import { getProfilePictureUrl } from "@/lib/utils";
 const COLORS = ["#5B8FFF", "#FFB366", "#5DD37C", "#FF6B6B", "#8884d8", "#9CA3AF"]; // Added Gray for Others
 
 const asArray = (value: any) => (Array.isArray(value) ? value : []);
+const toNumber = (value: unknown, fallback = 0) => {
+  const normalized =
+    typeof value === "string"
+      ? Number(value.replace(/,/g, "").trim())
+      : Number(value);
+  return Number.isFinite(normalized) ? normalized : fallback;
+};
 
 interface DashboardProps {
   onNavigate: (page: string) => void;
@@ -33,6 +41,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [monthlyStats, setMonthlyStats] = useState<any[]>([]);
   const [serviceStats, setServiceStats] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,11 +54,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
         const headers = { 'Authorization': `Bearer ${token}` };
 
-        const [statsRes, monthlyRes, serviceRes, activityRes] = await Promise.all([
+        const [statsRes, monthlyRes, serviceRes, activityRes, inventoryRes] = await Promise.all([
           fetch('http://localhost:5000/api/admin/stats', { headers }),
           fetch('http://localhost:5000/api/admin/monthly-stats', { headers }),
           fetch('http://localhost:5000/api/admin/service-distribution', { headers }),
-          fetch('http://localhost:5000/api/admin/recent-activity', { headers })
+          fetch('http://localhost:5000/api/admin/recent-activity', { headers }),
+          fetch('http://localhost:5000/api/inventory/items', { headers })
         ]);
 
         const responses = [statsRes, monthlyRes, serviceRes, activityRes];
@@ -64,6 +74,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         const monthly = monthlyRes.ok ? await monthlyRes.json() : [];
         const services = serviceRes.ok ? await serviceRes.json() : [];
         const activity = activityRes.ok ? await activityRes.json() : [];
+        const inventory = inventoryRes.ok ? await inventoryRes.json() : [];
 
         setStatsData(stats);
         setMonthlyStats(asArray(monthly));
@@ -108,6 +119,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           };
         }));
 
+        setInventoryItems(asArray(inventory));
+
       } catch (error) {
         console.error('Error fetching admin dashboard data:', error);
       }
@@ -120,6 +133,24 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     if (!num) return "0";
     return Number(num).toLocaleString();
   };
+
+  const inventoryByCategory = inventoryItems.reduce((acc: Record<string, number>, item: any) => {
+    const category = item.category_name || "Uncategorized";
+    const qty = toNumber(item.quantity_on_hand || 0);
+    acc[category] = (acc[category] || 0) + qty;
+    return acc;
+  }, {});
+
+  const inventoryChartData = Object.entries(inventoryByCategory)
+    .map(([name, qty]) => ({ name, qty }))
+    .sort((a, b) => b.qty - a.qty)
+    .slice(0, 6);
+
+  const lowStockCount = inventoryItems.filter((item: any) => {
+    const qty = toNumber(item.quantity_on_hand || 0);
+    const reorderLevel = toNumber(item.reorder_level || 0);
+    return reorderLevel > 0 && qty <= reorderLevel;
+  }).length;
 
   const formatCurrency = (num: number | string) => {
     if (!num) return "₱0";
@@ -297,39 +328,80 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       </div>
 
-      {/* Service Distribution */}
-      <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
-        <h3 className="text-lg font-semibold text-foreground mb-4">
-          Service Distribution
-        </h3>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={serviceStats}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={100}
-                paddingAngle={5}
-                dataKey="value"
-              >
-                {serviceStats.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: "hsl(var(--popover))",
-                  borderRadius: "8px",
-                  border: "1px solid hsl(var(--border))",
-                  color: "hsl(var(--popover-foreground))"
-                }}
-                itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-              />
-              <Legend wrapperStyle={{ color: 'hsl(var(--foreground))' }} />
-            </PieChart>
-          </ResponsiveContainer>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Service Distribution */}
+        <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
+          <h3 className="text-lg font-semibold text-foreground mb-4">
+            Service Distribution
+          </h3>
+          <div className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={serviceStats}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={45}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {serviceStats.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--popover))",
+                    borderRadius: "8px",
+                    border: "1px solid hsl(var(--border))",
+                    color: "hsl(var(--popover-foreground))"
+                  }}
+                  itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+                />
+                <Legend wrapperStyle={{ color: 'hsl(var(--foreground))' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Inventory Snapshot */}
+        <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <Boxes className="w-5 h-5 text-primary" /> Inventory Snapshot
+            </h3>
+            <div className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded-full">
+              <AlertTriangle className="w-3 h-3" /> {lowStockCount} low stock
+            </div>
+          </div>
+          <div className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={inventoryChartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--popover))',
+                    borderColor: 'hsl(var(--border))',
+                    color: 'hsl(var(--popover-foreground))'
+                  }}
+                  formatter={(value: any) => [`${Number(value).toLocaleString()}`, 'Units']}
+                />
+                <Bar dataKey="qty" fill="#5B8FFF" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </div>
