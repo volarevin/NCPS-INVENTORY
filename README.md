@@ -1,4 +1,4 @@
-# NCPS - Network Computer Professional Services
+# NCPS - Nasugbu Computer Parts Services
 
 ## Manual Setup (First Time Only)
 
