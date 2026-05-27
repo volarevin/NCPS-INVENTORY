@@ -101,6 +101,51 @@ export function Inventory() {
   const [adjustForm, setAdjustForm] = useState<AdjustFormState>(defaultAdjustForm);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+  const handleDeleteItem = (id?: number | null) => {
+    if (!id) return;
+    const token = sessionStorage.getItem("token");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    const promise = async () => {
+      const response = await fetch(`http://localhost:5000/api/inventory/items/${id}/delete`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+      let data: { message?: string } = {};
+      if (contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        if (!response.ok) {
+          throw new Error(
+            text.includes("Cannot POST") || text.includes("Cannot DELETE")
+              ? "Delete endpoint not available. Restart the API server and try again."
+              : "Failed to delete item"
+          );
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to delete item");
+      }
+
+      await fetchItems();
+      setSheetOpen(false);
+      return data.message || "Item deleted successfully";
+    };
+
+    showPromise(promise(), {
+      loading: "Deleting item...",
+      success: (message) => message,
+      error: (err) => err.message || "Failed to delete item",
+    });
+  };
+
   const fetchCategories = async () => {
     try {
       const token = sessionStorage.getItem("token");
@@ -719,9 +764,16 @@ export function Inventory() {
               Cancel
             </Button>
             {activeTab === "details" ? (
-              <Button onClick={handleSaveItem} disabled={!itemForm.name.trim()}>
-                {sheetMode === "create" ? "Create Item" : "Save Changes"}
-              </Button>
+              <div className="flex items-center gap-2">
+                {sheetMode === "edit" && (
+                  <Button variant="destructive" onClick={() => handleDeleteItem(selectedItem?.item_id)}>
+                    Delete
+                  </Button>
+                )}
+                <Button onClick={handleSaveItem} disabled={!itemForm.name.trim()}>
+                  {sheetMode === "create" ? "Create Item" : "Save Changes"}
+                </Button>
+              </div>
             ) : (
               <Button onClick={handleAdjustStock} disabled={normalizedAdjustQty <= 0}>
                 Apply Change

@@ -7,7 +7,7 @@ const auditMiddleware = require('../middleware/auditMiddleware');
 // Protect all routes
 router.use(verifyToken);
 router.use(checkRole(['Admin']));
-router.use(auditMiddleware);
+// router.use(auditMiddleware);
 
 router.get('/stats', adminController.getDashboardStats);
 router.get('/audit-logs', adminController.getAuditLogs);

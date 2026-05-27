@@ -14,6 +14,12 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Debug logging for /api/admin
+app.use('/api/admin', (req, res, next) => {
+  console.log('Admin API Request:', req.method, req.path, new Date().toISOString());
+  next();
+});
+
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));

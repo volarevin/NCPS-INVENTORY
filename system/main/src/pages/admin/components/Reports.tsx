@@ -39,13 +39,30 @@ const MONTH_LABELS = [
 const asArray = (value: any) => (Array.isArray(value) ? value : []);
 
 function parseMonthLabel(label: string) {
-  const match = /^([A-Za-z]{3})\s+(\d{4})$/.exec(label.trim());
-  if (!match) return null;
+  // Handle format: "2025-05"
+  const match = /^(\d{4})-(\d{2})$/.exec(label.trim());
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]) - 1; // Convert to 0-indexed
+    if (!Number.isFinite(year) || !Number.isFinite(month) || month < 0 || month > 11) return null;
 
-  const monthIndex = MONTH_LABELS.indexOf(match[1]);
+    const start = new Date(year, month, 1);
+    const end = new Date(year, month + 1, 0);
+
+    return {
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0]
+    };
+  }
+
+  // Fallback to old format: "May 2025"
+  const oldMatch = /^([A-Za-z]{3})\s+(\d{4})$/.exec(label.trim());
+  if (!oldMatch) return null;
+
+  const monthIndex = MONTH_LABELS.indexOf(oldMatch[1]);
   if (monthIndex === -1) return null;
 
-  const year = Number(match[2]);
+  const year = Number(oldMatch[2]);
   if (!Number.isFinite(year)) return null;
 
   const start = new Date(year, monthIndex, 1);
@@ -57,7 +74,7 @@ function parseMonthLabel(label: string) {
   };
 }
 
-export function Reports() {
+export function Reports({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const navigate = useNavigate();
   const getCurrentMonthRange = () => {
     const now = new Date();
@@ -97,6 +114,7 @@ export function Reports() {
   });
   const [dateRange, setDateRange] = useState(getCurrentMonthRange());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasAutoAdjustedRange, setHasAutoAdjustedRange] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -123,7 +141,14 @@ export function Reports() {
       const response = await fetch(`http://localhost:5000/api/admin/reports?${queryParams}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        navigate('/login');
+        return;
+      }
+
       if (!response.ok) throw new Error('Failed to fetch reports');
       
       const data = await response.json();
@@ -152,6 +177,7 @@ export function Reports() {
       });
 
       if (
+        !hasAutoAdjustedRange &&
         dateRange.start === getCurrentMonthRange().start &&
         dateRange.end === getCurrentMonthRange().end &&
         (!data.summary || Number(data.summary.total) === 0) &&
@@ -169,10 +195,13 @@ export function Reports() {
             : null;
 
           if (latestMonth) {
+            setHasAutoAdjustedRange(true);
             setDateRange(getMonthRangeFromLabel(latestMonth));
             return;
           }
         }
+
+        setHasAutoAdjustedRange(true);
       }
 
     } catch (error) {
@@ -194,6 +223,13 @@ export function Reports() {
       const response = await fetch(`http://localhost:5000/api/admin/reports/export?${queryParams}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        navigate('/login');
+        return;
+      }
 
       if (!response.ok) throw new Error('Failed to export reports');
 
@@ -321,7 +357,13 @@ export function Reports() {
                   <div 
                     key={index} 
                     className="flex items-center justify-between p-3 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/admin/technicians`)}
+                    onClick={() => {
+                      if (onNavigate) {
+                        onNavigate('Technicians');
+                      } else {
+                        navigate('/admin/technicians');
+                      }
+                    }}
                   >
                     <div className="flex items-center gap-3">
                       <Avatar className="h-10 w-10 border border-border">
@@ -390,7 +432,19 @@ export function Reports() {
                     dataKey="month" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fill: 'hsl(var(--muted-foreground))' }} 
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    tickFormatter={(month) => {
+                      // Convert "2025-05" to "May '25"
+                      const match = /^(\d{4})-(\d{2})$/.exec(month);
+                      if (match) {
+                        const [, year, monthNum] = match;
+                        const monthIndex = Number(monthNum) - 1;
+                        const monthName = new Date(2024, monthIndex, 1).toLocaleString('default', { month: 'short' });
+                        const shortYear = year.slice(-2);
+                        return `${monthName} '${shortYear}`;
+                      }
+                      return month;
+                    }}
                   />
                   <YAxis 
                     axisLine={false} 

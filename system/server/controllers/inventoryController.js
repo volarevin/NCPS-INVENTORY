@@ -361,3 +361,59 @@ exports.getItemTransactions = (req, res) => {
     res.json(rows);
   });
 };
+
+exports.deleteItem = (req, res) => {
+  const { id } = req.params;
+
+  getConnection(req, res, (conn, shouldRelease) => {
+    conn.beginTransaction((err) => {
+      if (err) {
+        if (shouldRelease) conn.release();
+        return res.status(500).json({ message: 'Database transaction error.' });
+      }
+
+      const cleanupQueries = [
+        ['DELETE FROM inventory_transactions WHERE item_id = ?', [id]],
+        ['DELETE FROM appointment_parts WHERE item_id = ?', [id]],
+        ['DELETE FROM inventory_stock WHERE item_id = ?', [id]],
+        ['DELETE FROM inventory_items WHERE item_id = ?', [id]],
+      ];
+
+      const runNext = (index) => {
+        if (index >= cleanupQueries.length) {
+          return conn.commit((commitErr) => {
+            if (commitErr) {
+              return conn.rollback(() => {
+                if (shouldRelease) conn.release();
+                res.status(500).json({ message: 'Error committing delete.' });
+              });
+            }
+            if (shouldRelease) conn.release();
+            res.json({ message: 'Item deleted successfully.' });
+          });
+        }
+
+        const [sql, params] = cleanupQueries[index];
+        conn.query(sql, params, (queryErr, result) => {
+          if (queryErr) {
+            return conn.rollback(() => {
+              if (shouldRelease) conn.release();
+              res.status(500).json({ message: 'Database error or item is referenced elsewhere.' });
+            });
+          }
+
+          if (index === cleanupQueries.length - 1 && result.affectedRows === 0) {
+            return conn.rollback(() => {
+              if (shouldRelease) conn.release();
+              res.status(404).json({ message: 'Item not found.' });
+            });
+          }
+
+          runNext(index + 1);
+        });
+      };
+
+      runNext(0);
+    });
+  });
+};

@@ -15,5 +15,11 @@
             "username": "root",
             "password": ""
         }
-    ]
+    ],
+    "chat.tools.terminal.autoApprove": {
+        "/^cd c:\\\\Users\\\\blond\\\\Desktop\\\\NCPS-FINAL-main\\\\system\\\\server ; node server\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
 }

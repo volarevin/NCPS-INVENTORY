@@ -35,7 +35,7 @@ export default function AdminPage() {
       case "Inventory":
         return <Inventory />;
       case "Reports":
-        return <Reports />;
+        return <Reports onNavigate={setActiveTab} />;
       case "Audit Logs":
         return <AuditLogs />;
       case "My Profile":

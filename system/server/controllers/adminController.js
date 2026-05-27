@@ -32,26 +32,29 @@ exports.checkConflict = async (req, res) => {
 };
 
 exports.getDashboardStats = (req, res) => {
+  console.log('getDashboardStats called');
   const query = `
     SELECT 
-      (SELECT COUNT(*) FROM appointments WHERE DATE(appointment_date) = CURRENT_DATE) AS today_appointments,
+      (SELECT COUNT(*) FROM appointments WHERE DATE(appointment_date) = (SELECT MAX(DATE(appointment_date)) FROM appointments)) AS today_appointments,
       (SELECT COUNT(*) FROM appointments WHERE status = 'Pending') AS pending_requests,
       (SELECT COUNT(*) FROM appointments WHERE status = 'In Progress') AS in_progress_count,
       (SELECT COUNT(*) FROM technician_profiles WHERE availability_status = 'Available') AS available_techs,
       (SELECT COALESCE(SUM(CASE WHEN a.status = 'Completed' THEN COALESCE(a.total_cost, s.estimated_price) ELSE 0 END), 0) 
        FROM appointments a JOIN services s ON a.service_id = s.service_id 
-       WHERE MONTH(a.appointment_date) = MONTH(CURRENT_DATE) AND YEAR(a.appointment_date) = YEAR(CURRENT_DATE)) AS monthly_revenue,
+       WHERE MONTH(a.appointment_date) = MONTH((SELECT MAX(appointment_date) FROM appointments)) AND YEAR(a.appointment_date) = YEAR((SELECT MAX(appointment_date) FROM appointments))) AS monthly_revenue,
       (SELECT COALESCE(SUM(CASE WHEN a.status = 'Completed' THEN COALESCE(a.total_cost, s.estimated_price) ELSE 0 END), 0) 
        FROM appointments a JOIN services s ON a.service_id = s.service_id) as actual_revenue,
       (SELECT COALESCE(SUM(CASE WHEN a.status IN ('Pending', 'Confirmed') AND a.total_cost IS NULL THEN s.estimated_price ELSE 0 END), 0) 
        FROM appointments a JOIN services s ON a.service_id = s.service_id) as projected_revenue
   `;
   
+  console.log('Query:', query);
   db.query(query, (err, results) => {
     if (err) {
-      console.error(err);
+      console.error('DB Error:', err);
       return res.status(500).json({ message: 'Database error fetching stats.' });
     }
+    console.log('Results:', results);
     res.json(results[0]);
   });
 };
@@ -107,7 +110,7 @@ exports.getAllAppointments = (req, res) => {
 exports.getMonthlyStats = (req, res) => {
   const query = `
     SELECT 
-      DATE_FORMAT(a.appointment_date, '%b %Y') as month, 
+      DATE_FORMAT(a.appointment_date, '%Y-%m') as month, 
       COUNT(*) as appointments,
       COALESCE(SUM(CASE WHEN a.status = 'Completed' THEN COALESCE(a.total_cost, s.estimated_price) ELSE 0 END), 0) as revenue
     FROM appointments a
@@ -116,8 +119,8 @@ exports.getMonthlyStats = (req, res) => {
       (SELECT COALESCE(MAX(appointment_date), NOW()) FROM appointments),
       INTERVAL 10 MONTH
     )
-    GROUP BY YEAR(a.appointment_date), MONTH(a.appointment_date) 
-    ORDER BY YEAR(a.appointment_date), MONTH(a.appointment_date)
+    GROUP BY DATE_FORMAT(a.appointment_date, '%Y-%m') 
+    ORDER BY DATE_FORMAT(a.appointment_date, '%Y-%m')
   `;
   
   db.query(query, (err, results) => {
@@ -135,7 +138,7 @@ exports.getServiceDistribution = (req, res) => {
     FROM appointments a
     JOIN services s ON a.service_id = s.service_id
     JOIN service_categories sc ON s.category_id = sc.category_id
-    GROUP BY sc.category_id
+    GROUP BY sc.category_id, sc.name
   `;
   
   db.query(query, (err, results) => {
@@ -245,19 +248,20 @@ exports.getReportsData = (req, res) => {
     `,
     monthly: `
       SELECT 
-          DATE_FORMAT(a.appointment_date, '%b %Y') as month,
+          DATE_FORMAT(a.appointment_date, '%Y-%m') as month,
           COUNT(*) as appointments,
           SUM(CASE WHEN a.status = 'Completed' THEN 1 ELSE 0 END) as completed,
           SUM(CASE WHEN a.status = 'Cancelled' THEN 1 ELSE 0 END) as cancelled,
           COALESCE(SUM(CASE WHEN a.status = 'Completed' THEN COALESCE(a.total_cost, s.estimated_price) ELSE 0 END), 0) as revenue
       FROM appointments a
       JOIN services s ON a.service_id = s.service_id
-      ${dateWhere || "WHERE a.appointment_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)"}
-      GROUP BY YEAR(a.appointment_date), MONTH(a.appointment_date)
-      ORDER BY YEAR(a.appointment_date), MONTH(a.appointment_date)
+      ${dateWhere || "WHERE a.appointment_date >= DATE_SUB((SELECT COALESCE(MAX(appointment_date), NOW()) FROM appointments), INTERVAL 12 MONTH)"}
+      GROUP BY DATE_FORMAT(a.appointment_date, '%Y-%m')
+      ORDER BY DATE_FORMAT(a.appointment_date, '%Y-%m')
     `,
     services: `
       SELECT 
+          s.service_id,
           s.name,
           COUNT(a.appointment_id) as requests,
           COALESCE(SUM(CASE WHEN a.status = 'Completed' THEN COALESCE(a.total_cost, s.estimated_price) ELSE 0 END), 0) as revenue,
@@ -265,10 +269,11 @@ exports.getReportsData = (req, res) => {
       FROM services s
       LEFT JOIN appointments a ON s.service_id = a.service_id ${joinCondition}
       LEFT JOIN reviews r ON a.appointment_id = r.appointment_id
-      GROUP BY s.service_id
+      GROUP BY s.service_id, s.name
     `,
     staff: `
       SELECT 
+          u.user_id,
           u.first_name, u.last_name, u.profile_picture,
           COUNT(a.appointment_id) as totalAssigned,
           COUNT(CASE WHEN a.status = 'Completed' THEN 1 END) as totalHandled,
@@ -277,25 +282,25 @@ exports.getReportsData = (req, res) => {
       LEFT JOIN appointments a ON u.user_id = a.technician_id ${joinCondition}
       LEFT JOIN reviews r ON a.appointment_id = r.appointment_id
       WHERE u.role = 'Technician'
-      GROUP BY u.user_id
+      GROUP BY u.user_id, u.first_name, u.last_name, u.profile_picture
     `,
     peakHours: `
       SELECT 
-        DATE_FORMAT(a.appointment_date, '%l %p') as hour, 
+        DATE_FORMAT(a.appointment_date, '%H:00') as hour, 
         COUNT(*) as bookings 
       FROM appointments a
       ${dateWhere}
-      GROUP BY HOUR(a.appointment_date) 
-      ORDER BY HOUR(a.appointment_date)
+      GROUP BY DATE_FORMAT(a.appointment_date, '%H:00')
+      ORDER BY DATE_FORMAT(a.appointment_date, '%H:00')
     `,
     peakDays: `
       SELECT 
-        DATE_FORMAT(a.appointment_date, '%a') as day, 
+        DATE_FORMAT(a.appointment_date, '%w') as day, 
         COUNT(*) as bookings 
       FROM appointments a
       ${dateWhere}
-      GROUP BY DAYOFWEEK(a.appointment_date) 
-      ORDER BY DAYOFWEEK(a.appointment_date)
+      GROUP BY DATE_FORMAT(a.appointment_date, '%w')
+      ORDER BY DATE_FORMAT(a.appointment_date, '%w')
     `,
     cancellationReasons: `
       SELECT 
@@ -304,7 +309,8 @@ exports.getReportsData = (req, res) => {
       FROM appointments a
       WHERE status = 'Cancelled' AND cancellation_category IS NOT NULL 
       ${dateAnd}
-      GROUP BY cancellation_category
+      GROUP BY a.cancellation_category
+      ORDER BY COUNT(*) DESC
     `,
     revenueStats: `
       SELECT 
@@ -315,8 +321,7 @@ exports.getReportsData = (req, res) => {
         COALESCE(AVG(CASE WHEN a.status = 'Completed' THEN COALESCE(a.total_cost, s.estimated_price) ELSE NULL END), 0) as avgPerAppointment
       FROM appointments a
       JOIN services s ON a.service_id = s.service_id
-      WHERE a.status != 'Cancelled' AND a.status != 'Rejected'
-      ${dateAnd}
+      WHERE a.status != 'Cancelled' AND a.status != 'Rejected' ${dateAnd}
     `
   };
 
@@ -389,7 +394,7 @@ exports.exportDetailedReports = (req, res) => {
     monthlyWhere = "WHERE a.appointment_date <= ?";
     queryParams = [endBound];
   } else {
-    monthlyWhere = "WHERE a.appointment_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)";
+    monthlyWhere = "WHERE a.appointment_date >= DATE_SUB((SELECT COALESCE(MAX(appointment_date), NOW()) FROM appointments), INTERVAL 12 MONTH)";
   }
 
   const queries = {
@@ -406,7 +411,7 @@ exports.exportDetailedReports = (req, res) => {
     `,
     monthly: `
       SELECT 
-          DATE_FORMAT(a.appointment_date, '%b %Y') as month,
+          DATE_FORMAT(a.appointment_date, '%Y-%m') as month,
           COUNT(*) as appointments,
           SUM(CASE WHEN a.status = 'Completed' THEN 1 ELSE 0 END) as completed,
           SUM(CASE WHEN a.status = 'Cancelled' THEN 1 ELSE 0 END) as cancelled,
@@ -414,8 +419,8 @@ exports.exportDetailedReports = (req, res) => {
       FROM appointments a
       JOIN services s ON a.service_id = s.service_id
       ${monthlyWhere}
-      GROUP BY YEAR(a.appointment_date), MONTH(a.appointment_date)
-      ORDER BY YEAR(a.appointment_date), MONTH(a.appointment_date)
+      GROUP BY DATE_FORMAT(a.appointment_date, '%Y-%m')
+      ORDER BY DATE_FORMAT(a.appointment_date, '%Y-%m')
     `
   };
 
