@@ -18,6 +18,7 @@ interface Appointment {
   customerName: string;
   service: string;
   serviceId?: string;
+  servicePrice?: number;
   date: string;
   time: string;
   phone: string;
@@ -46,7 +47,6 @@ export default function TechnicianPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [technicianProfile, setTechnicianProfile] = useState<any>(null);
-  const [availability, setAvailability] = useState<{ status: string, is_online: number, last_seen: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Heartbeat
@@ -74,12 +74,7 @@ export default function TechnicianPage() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
-        const data = await res.json();
-        setAvailability({
-            status: data.availability_status,
-            is_online: data.is_online,
-            last_seen: data.last_seen
-        });
+        // Availability fetched but not used currently
       }
     } catch (error) {
       console.error("Error fetching availability", error);
@@ -92,29 +87,30 @@ export default function TechnicianPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleStatusChange = async (newStatus: string) => {
-      try {
-          const token = localStorage.getItem('token');
-          const res = await fetch('http://localhost:5000/api/technician/availability', {
-              method: 'PUT',
-              headers: { 
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}` 
-              },
-              body: JSON.stringify({ status: newStatus })
-          });
-          
-          if (res.ok) {
-              fetchAvailability();
-          } else {
-              const err = await res.json();
-              // Show error toast?
-              console.error(err.message);
-          }
-      } catch (error) {
-          console.error("Error updating status", error);
-      }
-  };
+  // Status change functionality removed - not currently used
+  // const handleStatusChange = async (newStatus: string) => {
+  //     try {
+  //         const token = localStorage.getItem('token');
+  //         const res = await fetch('http://localhost:5000/api/technician/availability', {
+  //             method: 'PUT',
+  //             headers: { 
+  //                 'Content-Type': 'application/json',
+  //                 'Authorization': `Bearer ${token}` 
+  //             },
+  //             body: JSON.stringify({ status: newStatus })
+  //         });
+  //         
+  //         if (res.ok) {
+  //             fetchAvailability();
+  //         } else {
+  //             const err = await res.json();
+  //             // Show error toast?
+  //             console.error(err.message);
+  //         }
+  //     } catch (error) {
+  //         console.error("Error updating status", error);
+  //     }
+  // };
 
   useEffect(() => {
     document.title = "Technician Dashboard";
@@ -202,10 +198,11 @@ export default function TechnicianPage() {
       const data = await jobsResponse.json();
       const servicesData = servicesResponse.ok ? await servicesResponse.json() : [];
       const servicePriceMap = new Map(
-        (Array.isArray(servicesData) ? servicesData : []).map((service: any) => [
-          String(service.service_id),
-          Number(service.base_price || 0)
-        ])
+        (Array.isArray(servicesData) ? servicesData : []).map((service: any) => {
+          const raw = service.estimated_price ?? service.base_price ?? service.estimate_price ?? service.price ?? service.service_price ?? 0;
+          const value = Number(raw) || 0;
+          return [String(service.service_id), value];
+        })
       );
 
       const formatted = data.map((job: any) => {
@@ -218,15 +215,8 @@ export default function TechnicianPage() {
           status = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
         }
 
-        const serviceBase = Number(
-          job.estimated_price ??
-          job.estimate_price ??
-          job.service_price ??
-          job.base_price ??
-          job.price ??
-          job.total_cost ??
-          0
-        );
+        const rawJobPrice = job.estimated_price ?? job.service_price ?? job.base_price ?? job.estimate_price ?? job.price ?? job.total_cost ?? 0;
+        const serviceBase = Number(rawJobPrice) || 0;
         const fallbackBase = job.service_id ? servicePriceMap.get(String(job.service_id)) ?? 0 : 0;
         const resolvedServiceBase = serviceBase || fallbackBase;
 

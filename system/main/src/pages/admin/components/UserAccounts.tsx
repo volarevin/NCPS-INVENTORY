@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { UserCard } from "./UserCard";
 import { UserDetailsDialog } from "./UserDetailsDialog";
 import { AddUserDialog } from "./AddUserDialog";
-import { Search, Users, Shield, UserPlus, UserCheck, Activity, Trash2 } from "lucide-react";
+import { Search, Users, Shield, UserPlus, UserCheck, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { getProfilePictureUrl } from "@/lib/utils";
 import {

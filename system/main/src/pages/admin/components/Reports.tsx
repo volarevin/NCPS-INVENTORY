@@ -31,9 +31,51 @@ import { getProfilePictureUrl } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 
 const COLORS = ['#60A5FA', '#34D399', '#F472B6', '#FBBF24', '#A78BFA', '#22D3EE', '#F87171', '#10B981'];
+const MONTH_LABELS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+];
+
+const asArray = (value: any) => (Array.isArray(value) ? value : []);
+
+function parseMonthLabel(label: string) {
+  const match = /^([A-Za-z]{3})\s+(\d{4})$/.exec(label.trim());
+  if (!match) return null;
+
+  const monthIndex = MONTH_LABELS.indexOf(match[1]);
+  if (monthIndex === -1) return null;
+
+  const year = Number(match[2]);
+  if (!Number.isFinite(year)) return null;
+
+  const start = new Date(year, monthIndex, 1);
+  const end = new Date(year, monthIndex + 1, 0);
+
+  return {
+    start: start.toISOString().split('T')[0],
+    end: end.toISOString().split('T')[0]
+  };
+}
 
 export function Reports() {
   const navigate = useNavigate();
+  const getCurrentMonthRange = () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return {
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0]
+    };
+  };
+  const getMonthRangeFromLabel = (label: string) => {
+    const parsed = parseMonthLabel(label);
+    if (!parsed) {
+      return getCurrentMonthRange();
+    }
+
+    return parsed;
+  };
   const [summary, setSummary] = useState<any>({
     total: 0,
     completed: 0,
@@ -53,17 +95,24 @@ export function Reports() {
     combinedRevenue: 0,
     avgPerAppointment: 0
   });
-  const [dateRange, setDateRange] = useState({
-    start: "",
-    end: ""
-  });
+  const [dateRange, setDateRange] = useState(getCurrentMonthRange());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     fetchData();
   }, [dateRange]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchData();
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [dateRange]);
+
   const fetchData = async () => {
     try {
+      setIsRefreshing(true);
       const token = sessionStorage.getItem('token');
       if (!token) return;
 
@@ -79,20 +128,57 @@ export function Reports() {
       
       const data = await response.json();
       
-      setSummary(data.summary);
-      setMonthlyData(data.monthly);
-      setServiceData(data.services);
-      setStaffData(data.staff);
-      setPeakHours(data.peakHours);
-      setPeakDays(data.peakDays);
-      setCancellationReasonsData(data.cancellationReasons.map((c: any, i: number) => ({
+      setSummary(data.summary || {
+        total: 0,
+        completed: 0,
+        pending: 0,
+        confirmed: 0,
+        cancelled: 0,
+      });
+      setMonthlyData(asArray(data.monthly));
+      setServiceData(asArray(data.services));
+      setStaffData(asArray(data.staff));
+      setPeakHours(asArray(data.peakHours));
+      setPeakDays(asArray(data.peakDays));
+      setCancellationReasonsData(asArray(data.cancellationReasons).map((c: any, i: number) => ({
         ...c,
         color: COLORS[i % COLORS.length]
       })));
-      setRevenueStats(data.revenueStats);
+      setRevenueStats(data.revenueStats || {
+        actualRevenue: 0,
+        projectedRevenue: 0,
+        combinedRevenue: 0,
+        avgPerAppointment: 0
+      });
+
+      if (
+        dateRange.start === getCurrentMonthRange().start &&
+        dateRange.end === getCurrentMonthRange().end &&
+        (!data.summary || Number(data.summary.total) === 0) &&
+        (!Array.isArray(data.monthly) || data.monthly.length === 0)
+      ) {
+        const fallbackResponse = await fetch('http://localhost:5000/api/admin/reports', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          const fallbackMonthly = asArray(fallbackData.monthly);
+          const latestMonth = fallbackMonthly.length > 0
+            ? fallbackMonthly[fallbackMonthly.length - 1]?.month
+            : null;
+
+          if (latestMonth) {
+            setDateRange(getMonthRangeFromLabel(latestMonth));
+            return;
+          }
+        }
+      }
 
     } catch (error) {
       console.error('Error fetching reports:', error);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -128,18 +214,28 @@ export function Reports() {
     <div className="space-y-6 animate-fade-in pb-10">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <PageHeader title="Reports & Analytics" />
-        <div className="flex items-center gap-2 bg-card p-2 rounded-lg border border-border shadow-sm">
+        <div className="flex items-center gap-2 bg-card p-2 rounded-lg border border-border shadow-sm flex-wrap">
           <input 
             type="date" 
             className="bg-transparent border-none text-sm focus:ring-0 text-foreground"
+            value={dateRange.start}
             onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
           />
           <span className="text-muted-foreground">-</span>
           <input 
             type="date" 
             className="bg-transparent border-none text-sm focus:ring-0 text-foreground"
+            value={dateRange.end}
             onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
           />
+          <button
+            type="button"
+            onClick={fetchData}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+            disabled={isRefreshing}
+          >
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
       </div>
 

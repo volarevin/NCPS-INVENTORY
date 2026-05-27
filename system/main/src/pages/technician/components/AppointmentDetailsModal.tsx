@@ -27,6 +27,7 @@ interface Appointment {
   customerName: string;
   service: string;
   serviceId?: string;
+  servicePrice?: number; // Added servicePrice to store the base cost of the service
   date: string;
   time: string;
   phone: string;
@@ -48,7 +49,7 @@ interface Appointment {
 interface AppointmentDetailsModalProps {
   appointment: Appointment;
   onClose: () => void;
-  onUpdateStatus: (appointmentId: string, newStatus: "Pending" | "In Progress" | "Completed" | "Cancelled", reason?: string, category?: string, totalCost?: number, costNotes?: string, overrideEarlyStart?: boolean) => void;
+  onUpdateStatus: (appointmentId: string, newStatus: "Pending" | "In Progress" | "Completed" | "Cancelled", reason?: string, category?: string, totalCost?: number, costNotes?: string, overrideEarlyStart?: boolean, parts?: { itemId: number; quantity: number }[]) => void;
   isTechnician?: boolean;
 }
 
@@ -468,11 +469,12 @@ export default function AppointmentDetailsModal({
       <CompleteJobDialog 
         isOpen={showCompleteDialog}
         onClose={() => setShowCompleteDialog(false)}
-        onConfirm={(cost, notes) => {
-          onUpdateStatus(appointment.id, "Completed", undefined, undefined, cost, notes);
+        onConfirm={(cost, notes, parts) => {
+          onUpdateStatus(appointment.id, "Completed", undefined, undefined, cost, notes, undefined, parts);
           onClose();
         }}
         serviceName={appointment.service}
+        serviceBaseCost={appointment.servicePrice ?? 0}
       />
 
       {/* Early Start Warning Dialog */}

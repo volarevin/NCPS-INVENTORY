@@ -21,6 +21,8 @@ import { getProfilePictureUrl } from "@/lib/utils";
 
 const COLORS = ["#5B8FFF", "#FFB366", "#5DD37C", "#FF6B6B", "#8884d8", "#9CA3AF"]; // Added Gray for Others
 
+const asArray = (value: any) => (Array.isArray(value) ? value : []);
+
 interface DashboardProps {
   onNavigate: (page: string) => void;
 }
@@ -64,10 +66,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         const activity = activityRes.ok ? await activityRes.json() : [];
 
         setStatsData(stats);
-        setMonthlyStats(Array.isArray(monthly) ? monthly : []);
+        setMonthlyStats(asArray(monthly));
         
         // Format service stats for Pie Chart
-        const safeServices = Array.isArray(services) ? services : [];
+        const safeServices = asArray(services);
         setServiceStats(safeServices.map((s: any, index: number) => ({
           name: s.name,
           value: s.value,
@@ -75,33 +77,34 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         })));
 
         // Format activity (Audit Logs)
-        const safeActivity = Array.isArray(activity) ? activity : [];
+        const safeActivity = asArray(activity);
         setRecentActivity(safeActivity.map((a: any) => {
+          const actionText = String(a?.action || "");
           let icon = Activity;
           let color = "#5B8FFF";
 
-          if (a.action.includes("Create") || a.action.includes("Insert")) {
+          if (actionText.includes("Create") || actionText.includes("Insert")) {
              icon = CheckCircle;
              color = "#5DD37C";
-          } else if (a.action.includes("Update") || a.action.includes("Edit")) {
+          } else if (actionText.includes("Update") || actionText.includes("Edit")) {
              icon = Pencil;
              color = "#FFB366";
-          } else if (a.action.includes("Delete") || a.action.includes("Remove")) {
+          } else if (actionText.includes("Delete") || actionText.includes("Remove")) {
              icon = Trash;
              color = "#FF6B6B";
-          } else if (a.action.includes("Login")) {
+          } else if (actionText.includes("Login")) {
              icon = UserCheck;
              color = "#5B8FFF";
           }
 
           return {
-            id: a.log_id,
-            title: `${a.action} ${a.table_name}`,
-            user: a.actor_username || 'System',
-            time: new Date(a.created_at).toLocaleString(),
+            id: a?.log_id,
+            title: `${actionText || 'Activity'} ${a?.table_name || ''}`.trim(),
+            user: a?.actor_username || 'System',
+            time: a?.created_at ? new Date(a.created_at).toLocaleString() : 'Unknown time',
             icon,
             color,
-            profile_picture: a.profile_picture
+            profile_picture: a?.profile_picture
           };
         }));
 

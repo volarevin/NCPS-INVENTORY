@@ -345,7 +345,8 @@ export function TechnicianAppointments({
               selectedJobForCompletion?.servicePrice ??
               selectedJobForCompletion?.service_price ??
               selectedJobForCompletion?.estimated_price ??
-              selectedJobForCompletion?.estimate_price ??
+              selectedJobForCompletion?.base_price ??
+              selectedJobForCompletion?.price ??
               0
             }
             serviceName={selectedJobForCompletion?.service}

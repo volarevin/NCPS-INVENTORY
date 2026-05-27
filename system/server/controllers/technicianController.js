@@ -8,8 +8,7 @@ exports.getAssignedJobs = (req, res) => {
           u.email as customer_email, u.phone_number as customer_phone, u.profile_picture as customer_profile_picture,
           s.name as service_name,
           s.estimated_price as estimated_price,
-          s.estimate_price as estimate_price,
-          COALESCE(s.estimated_price, s.estimate_price, a.total_cost, 0) as service_price,
+          COALESCE(s.estimated_price, a.total_cost, 0) as service_price,
            r.rating, r.feedback_text,
            cb.role as cancelled_by_role, cb.user_id as cancelled_by_id
     FROM appointments a

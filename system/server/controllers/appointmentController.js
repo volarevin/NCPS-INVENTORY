@@ -208,7 +208,7 @@ exports.updateAppointmentStatus = (req, res) => {
     }
 
     const baseQuery = `
-      SELECT COALESCE(s.estimated_price, s.estimate_price, 0) AS base_price
+      SELECT COALESCE(s.estimated_price, 0) AS base_price
       FROM appointments a
       JOIN services s ON a.service_id = s.service_id
       WHERE a.appointment_id = ?

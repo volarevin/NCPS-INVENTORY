@@ -107,12 +107,15 @@ exports.getAllAppointments = (req, res) => {
 exports.getMonthlyStats = (req, res) => {
   const query = `
     SELECT 
-      DATE_FORMAT(a.appointment_date, '%b') as month, 
+      DATE_FORMAT(a.appointment_date, '%b %Y') as month, 
       COUNT(*) as appointments,
       COALESCE(SUM(CASE WHEN a.status = 'Completed' THEN COALESCE(a.total_cost, s.estimated_price) ELSE 0 END), 0) as revenue
     FROM appointments a
     JOIN services s ON a.service_id = s.service_id
-    WHERE a.appointment_date >= DATE_SUB(NOW(), INTERVAL 10 MONTH)
+    WHERE a.appointment_date >= DATE_SUB(
+      (SELECT COALESCE(MAX(appointment_date), NOW()) FROM appointments),
+      INTERVAL 10 MONTH
+    )
     GROUP BY YEAR(a.appointment_date), MONTH(a.appointment_date) 
     ORDER BY YEAR(a.appointment_date), MONTH(a.appointment_date)
   `;
@@ -204,27 +207,29 @@ exports.getUserActivityLogs = (req, res) => {
 
 exports.getReportsData = (req, res) => {
   const { startDate, endDate } = req.query;
+  const startBound = startDate ? `${startDate} 00:00:00` : null;
+  const endBound = endDate ? `${endDate} 23:59:59` : null;
   
   let dateWhere = "";
   let dateAnd = "";
   let joinCondition = "";
   let queryParams = [];
 
-  if (startDate && endDate) {
+  if (startBound && endBound) {
     dateWhere = "WHERE a.appointment_date BETWEEN ? AND ?";
     dateAnd = "AND a.appointment_date BETWEEN ? AND ?";
     joinCondition = "AND a.appointment_date BETWEEN ? AND ?";
-    queryParams = [startDate, endDate];
-  } else if (startDate) {
+    queryParams = [startBound, endBound];
+  } else if (startBound) {
     dateWhere = "WHERE a.appointment_date >= ?";
     dateAnd = "AND a.appointment_date >= ?";
     joinCondition = "AND a.appointment_date >= ?";
-    queryParams = [startDate];
-  } else if (endDate) {
+    queryParams = [startBound];
+  } else if (endBound) {
     dateWhere = "WHERE a.appointment_date <= ?";
     dateAnd = "AND a.appointment_date <= ?";
     joinCondition = "AND a.appointment_date <= ?";
-    queryParams = [endDate];
+    queryParams = [endBound];
   }
 
   const queries = {
@@ -364,23 +369,25 @@ exports.getReportsData = (req, res) => {
 
 exports.exportDetailedReports = (req, res) => {
   const { startDate, endDate } = req.query;
+  const startBound = startDate ? `${startDate} 00:00:00` : null;
+  const endBound = endDate ? `${endDate} 23:59:59` : null;
   
   let serviceJoinCondition = "";
   let monthlyWhere = "";
   let queryParams = [];
 
-  if (startDate && endDate) {
+  if (startBound && endBound) {
     serviceJoinCondition = "AND a.appointment_date BETWEEN ? AND ?";
     monthlyWhere = "WHERE a.appointment_date BETWEEN ? AND ?";
-    queryParams = [startDate, endDate];
-  } else if (startDate) {
+    queryParams = [startBound, endBound];
+  } else if (startBound) {
     serviceJoinCondition = "AND a.appointment_date >= ?";
     monthlyWhere = "WHERE a.appointment_date >= ?";
-    queryParams = [startDate];
-  } else if (endDate) {
+    queryParams = [startBound];
+  } else if (endBound) {
     serviceJoinCondition = "AND a.appointment_date <= ?";
     monthlyWhere = "WHERE a.appointment_date <= ?";
-    queryParams = [endDate];
+    queryParams = [endBound];
   } else {
     monthlyWhere = "WHERE a.appointment_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)";
   }
