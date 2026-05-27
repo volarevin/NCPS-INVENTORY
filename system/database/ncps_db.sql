@@ -1,11 +1,11 @@
 -- phpMyAdmin SQL Dump
--- version 5.2.1
+-- version 5.2.3
 -- https://www.phpmyadmin.net/
 --
--- Host: 127.0.0.1
--- Generation Time: Dec 01, 2025 at 05:55 PM
--- Server version: 10.4.32-MariaDB
--- PHP Version: 8.2.12
+-- Host: localhost:3306
+-- Generation Time: May 27, 2026 at 05:11 AM
+-- Server version: 8.4.3
+-- PHP Version: 8.3.30
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -21,42 +21,7 @@ SET time_zone = "+00:00";
 -- Database: `ncps_db`
 --
 
-DELIMITER $$
---
--- Procedures
---
-CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_cancel_appointment` (IN `p_appt_id` INT, IN `p_reason` TEXT, IN `p_category` VARCHAR(50))   BEGIN
-    UPDATE appointments 
-    SET status = 'Cancelled', 
-        cancellation_reason = p_reason,
-        cancellation_category = p_category
-    WHERE appointment_id = p_appt_id;
-    
-    -- Log this action
-    INSERT INTO activity_logs (action_type, description) 
-    VALUES ('Cancellation', CONCAT('Appointment #', p_appt_id, ' cancelled by user.'));
-END$$
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_get_admin_dashboard_stats` ()   BEGIN
-    SELECT 
-        (SELECT COUNT(*) FROM appointments WHERE DATE(appointment_date) = CURRENT_DATE) AS today_appointments,
-        (SELECT COUNT(*) FROM appointments WHERE status = 'Pending') AS pending_requests,
-        (SELECT COUNT(*) FROM appointments WHERE status = 'In Progress') AS in_progress_count,
-        (SELECT COUNT(*) FROM technician_profiles WHERE availability_status = 'Available') AS available_techs,
-        (SELECT COALESCE(SUM(total_cost), 0) FROM appointments WHERE status = 'Completed' AND MONTH(appointment_date) = MONTH(CURRENT_DATE)) AS monthly_revenue;
-END$$
-
-CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_get_customer_stats` (IN `p_customer_id` INT)   BEGIN
-    SELECT 
-        (SELECT COUNT(*) FROM appointments WHERE customer_id = p_customer_id AND status = 'Pending') AS pending_count,
-        (SELECT COUNT(*) FROM appointments WHERE customer_id = p_customer_id AND status = 'Completed') AS completed_count,
-        -- Get details of the NEXT upcoming appointment
-        (SELECT appointment_date FROM appointments 
-         WHERE customer_id = p_customer_id AND status IN ('Confirmed', 'Pending') AND appointment_date > NOW() 
-         ORDER BY appointment_date ASC LIMIT 1) AS next_appointment;
-END$$
-
-DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -65,31 +30,31 @@ DELIMITER ;
 --
 
 CREATE TABLE `appointments` (
-  `appointment_id` int(11) NOT NULL,
-  `customer_id` int(11) DEFAULT NULL,
-  `technician_id` int(11) DEFAULT NULL,
-  `service_id` int(11) NOT NULL,
-  `service_address` text DEFAULT NULL,
+  `appointment_id` int NOT NULL,
+  `customer_id` int DEFAULT NULL,
+  `technician_id` int DEFAULT NULL,
+  `service_id` int NOT NULL,
+  `service_address` text COLLATE utf8mb4_general_ci,
   `appointment_date` datetime NOT NULL,
-  `status` enum('Pending','Confirmed','In Progress','Completed','Cancelled','Rejected') DEFAULT 'Pending',
+  `status` enum('Pending','Confirmed','In Progress','Completed','Cancelled','Rejected') COLLATE utf8mb4_general_ci DEFAULT 'Pending',
   `total_cost` decimal(10,2) DEFAULT NULL,
-  `customer_notes` text DEFAULT NULL,
-  `cancellation_reason` text DEFAULT NULL,
-  `rejection_reason` text DEFAULT NULL,
-  `cancellation_category` enum('Change of plans','Found another service','Budget constraints','Emergency','Other','No available technician','Scheduling conflict','Service unavailable','Customer request','Duplicate booking') DEFAULT NULL,
-  `is_walk_in` tinyint(1) DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `payment_status` enum('Unpaid','Paid','Refunded') DEFAULT 'Unpaid',
-  `cancelled_by` int(11) DEFAULT NULL,
-  `marked_for_deletion` tinyint(1) DEFAULT 0,
+  `customer_notes` text COLLATE utf8mb4_general_ci,
+  `cancellation_reason` text COLLATE utf8mb4_general_ci,
+  `rejection_reason` text COLLATE utf8mb4_general_ci,
+  `cancellation_category` enum('Change of plans','Found another service','Budget constraints','Emergency','Other','No available technician','Scheduling conflict','Service unavailable','Customer request','Duplicate booking') COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `is_walk_in` tinyint(1) DEFAULT '0',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `payment_status` enum('Unpaid','Paid','Refunded') COLLATE utf8mb4_general_ci DEFAULT 'Unpaid',
+  `cancelled_by` int DEFAULT NULL,
+  `marked_for_deletion` tinyint(1) DEFAULT '0',
   `deletion_marked_at` datetime DEFAULT NULL,
-  `deletion_marked_by` int(11) DEFAULT NULL,
-  `walkin_name` varchar(100) DEFAULT NULL,
-  `walkin_phone` varchar(20) DEFAULT NULL,
-  `walkin_email` varchar(100) DEFAULT NULL,
-  `cost_currency` varchar(3) DEFAULT 'PHP',
-  `cost_notes` text DEFAULT NULL
+  `deletion_marked_by` int DEFAULT NULL,
+  `walkin_name` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `walkin_phone` varchar(20) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `walkin_email` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `cost_currency` varchar(3) COLLATE utf8mb4_general_ci DEFAULT 'PHP',
+  `cost_notes` text COLLATE utf8mb4_general_ci
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -97,223 +62,226 @@ CREATE TABLE `appointments` (
 --
 
 INSERT INTO `appointments` (`appointment_id`, `customer_id`, `technician_id`, `service_id`, `service_address`, `appointment_date`, `status`, `total_cost`, `customer_notes`, `cancellation_reason`, `rejection_reason`, `cancellation_category`, `is_walk_in`, `created_at`, `updated_at`, `payment_status`, `cancelled_by`, `marked_for_deletion`, `deletion_marked_at`, `deletion_marked_by`, `walkin_name`, `walkin_phone`, `walkin_email`, `cost_currency`, `cost_notes`) VALUES
-(1, 32, 8, 3, NULL, '2025-06-14 22:03:00', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:49:08', 'Paid', NULL, 1, '2025-12-01 23:49:08', 3, NULL, NULL, NULL, 'PHP', NULL),
-(2, 28, 12, 5, NULL, '2025-06-23 09:30:31', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:49:18', 'Paid', NULL, 1, '2025-12-01 23:49:18', 3, NULL, NULL, NULL, 'PHP', NULL),
-(3, 24, 4, 1, NULL, '2025-10-11 18:01:45', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(4, 18, 9, 1, NULL, '2025-07-03 04:34:04', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:49:33', 'Paid', NULL, 1, '2025-12-01 23:49:33', 3, NULL, NULL, NULL, 'PHP', NULL),
-(5, 18, 4, 5, NULL, '2025-12-06 13:15:47', 'Cancelled', 1000.00, NULL, NULL, NULL, 'Emergency', 0, '2025-11-24 09:18:17', '2025-11-28 16:22:45', 'Unpaid', 4, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(6, 29, NULL, 1, NULL, '2025-11-25 10:05:29', 'Rejected', 1500.00, NULL, 'Automated cleanup: Missing cancellation details filled.', 'Service not avaialable at the moment', 'Duplicate booking', 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(7, 25, 4, 8, NULL, '2025-12-10 03:35:40', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(8, 14, 4, 6, NULL, '2025-06-24 22:21:38', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:49:13', 'Paid', NULL, 1, '2025-12-01 23:49:13', 3, NULL, NULL, NULL, 'PHP', NULL),
-(9, 23, 12, 5, NULL, '2025-05-30 22:15:39', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(10, 26, 10, 6, NULL, '2025-10-06 05:03:44', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(11, 32, 12, 6, NULL, '2025-10-21 02:05:23', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(12, 31, 11, 5, NULL, '2025-08-05 19:45:08', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(13, 23, 10, 8, NULL, '2025-09-22 19:02:32', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(14, 28, 4, 3, NULL, '2025-06-29 00:37:45', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(1, 32, 8, 3, NULL, '2026-06-14 22:03:00', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:49:08', 'Paid', NULL, 1, '2025-12-01 23:49:08', 3, NULL, NULL, NULL, 'PHP', NULL),
+(2, 28, 12, 5, NULL, '2026-06-23 09:30:31', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:49:18', 'Paid', NULL, 1, '2025-12-01 23:49:18', 3, NULL, NULL, NULL, 'PHP', NULL),
+(3, 24, 4, 1, NULL, '2026-10-11 18:01:45', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(4, 18, 9, 1, NULL, '2026-07-03 04:34:04', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:49:33', 'Paid', NULL, 1, '2025-12-01 23:49:33', 3, NULL, NULL, NULL, 'PHP', NULL),
+(5, 18, 4, 5, NULL, '2026-12-06 13:15:47', 'Cancelled', 1000.00, NULL, NULL, NULL, 'Emergency', 0, '2026-11-24 09:18:17', '2026-11-28 16:22:45', 'Unpaid', 4, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(6, 29, NULL, 1, NULL, '2026-11-25 10:05:29', 'Rejected', 1500.00, NULL, 'Automated cleanup: Missing cancellation details filled.', 'Service not avaialable at the moment', 'Duplicate booking', 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(7, 25, 4, 8, NULL, '2026-12-10 03:35:40', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(8, 14, 4, 6, NULL, '2026-06-24 22:21:38', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:49:13', 'Paid', NULL, 1, '2025-12-01 23:49:13', 3, NULL, NULL, NULL, 'PHP', NULL),
+(9, 23, 12, 5, NULL, '2026-05-30 22:15:39', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(10, 26, 10, 6, NULL, '2026-10-06 05:03:44', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(11, 32, 12, 6, NULL, '2026-10-21 02:05:23', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(12, 31, 11, 5, NULL, '2026-08-05 19:45:08', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(13, 23, 10, 8, NULL, '2026-09-22 19:02:32', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(14, 28, 4, 3, NULL, '2026-06-29 00:37:45', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (15, 24, 4, 1, NULL, '2025-07-30 16:22:14', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(16, 20, 11, 7, NULL, '2025-12-23 08:45:10', 'Cancelled', 500.00, NULL, 'mukha kang burat', NULL, 'Customer request', 0, '2025-11-24 09:18:17', '2025-11-24 13:08:05', 'Unpaid', 1, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(17, 31, 9, 3, NULL, '2025-06-26 23:08:59', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:49:24', 'Paid', NULL, 1, '2025-12-01 23:49:24', 3, NULL, NULL, NULL, 'PHP', NULL),
-(18, 27, 9, 6, NULL, '2025-12-08 20:29:24', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(19, 30, NULL, 4, NULL, '2025-12-06 15:28:36', 'Pending', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(20, 19, 12, 4, NULL, '2025-12-17 07:24:04', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(21, 15, NULL, 7, NULL, '2025-11-28 05:26:44', 'Rejected', 500.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-11-24 09:18:17', '2025-12-01 15:56:59', 'Unpaid', NULL, 1, '2025-12-01 23:56:59', 1, NULL, NULL, NULL, 'PHP', NULL),
-(22, 2, 4, 1, 'Nasugbu, Batangas', '2025-06-05 21:59:33', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(23, 31, 9, 5, NULL, '2025-12-10 21:46:54', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(24, 30, NULL, 2, NULL, '2025-11-26 01:57:00', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(25, 32, NULL, 5, NULL, '2025-12-19 19:36:10', 'Cancelled', 1000.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', 1, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(16, 20, 11, 7, NULL, '2026-12-23 08:45:10', 'Cancelled', 500.00, NULL, 'mukha kang burat', NULL, 'Customer request', 0, '2026-11-24 09:18:17', '2026-11-24 13:08:05', 'Unpaid', 1, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(17, 31, 9, 3, NULL, '2026-06-26 23:08:59', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:49:24', 'Paid', NULL, 1, '2025-12-01 23:49:24', 3, NULL, NULL, NULL, 'PHP', NULL),
+(18, 27, 9, 6, NULL, '2026-12-08 20:29:24', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(19, 30, NULL, 4, NULL, '2026-12-06 15:28:36', 'Pending', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(20, 19, 12, 4, NULL, '2026-12-17 07:24:04', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(21, 15, NULL, 7, NULL, '2026-11-28 05:26:44', 'Rejected', 500.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-11-24 09:18:17', '2026-12-01 15:56:59', 'Unpaid', NULL, 1, '2025-12-01 23:56:59', 1, NULL, NULL, NULL, 'PHP', NULL),
+(22, 2, 4, 1, 'Nasugbu, Batangas', '2026-06-05 21:59:33', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(23, 31, 9, 5, NULL, '2026-12-10 21:46:54', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(24, 30, NULL, 2, NULL, '2026-11-26 01:57:00', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(25, 32, NULL, 5, NULL, '2026-12-19 19:36:10', 'Cancelled', 1000.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', 1, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (26, 17, 12, 2, NULL, '2025-09-04 09:13:37', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(27, 18, 8, 6, NULL, '2025-10-14 08:52:40', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(28, 21, 8, 8, NULL, '2025-09-18 01:22:51', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(29, 21, 4, 3, NULL, '2025-09-29 08:14:52', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(30, 32, 4, 5, NULL, '2025-06-29 00:57:25', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(27, 18, 8, 6, NULL, '2026-10-14 08:52:40', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(28, 21, 8, 8, NULL, '2026-09-18 01:22:51', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(29, 21, 4, 3, NULL, '2026-09-29 08:14:52', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(30, 32, 4, 5, NULL, '2026-06-29 00:57:25', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (31, 18, 12, 1, NULL, '2025-08-06 20:25:52', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(32, 13, NULL, 8, NULL, '2025-11-13 16:41:11', 'Cancelled', 0.00, NULL, 'Customer reason: Emergency', NULL, 'Emergency', 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(34, 20, 12, 5, NULL, '2025-12-19 23:35:13', 'Cancelled', 1000.00, NULL, 'FAHHHHHH', NULL, 'Customer request', 0, '2025-11-24 09:18:17', '2025-11-26 11:37:25', 'Unpaid', 1, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(35, 27, 8, 6, NULL, '2025-07-26 08:05:31', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(36, 29, 10, 6, NULL, '2025-06-02 08:51:43', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:48:56', 'Paid', NULL, 1, '2025-12-01 23:48:56', 3, NULL, NULL, NULL, 'PHP', NULL),
-(37, 30, 12, 5, NULL, '2025-11-30 13:19:52', 'Cancelled', 1000.00, NULL, 'technician is gay, sorry', NULL, 'No available technician', 0, '2025-11-24 09:18:17', '2025-11-26 08:07:19', 'Unpaid', 3, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(32, 13, NULL, 8, NULL, '2026-11-13 16:41:11', 'Cancelled', 0.00, NULL, 'Customer reason: Emergency', NULL, 'Emergency', 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(34, 20, 12, 5, NULL, '2026-12-19 23:35:13', 'Cancelled', 1000.00, NULL, 'FAHHHHHH', NULL, 'Customer request', 0, '2026-11-24 09:18:17', '2026-11-26 11:37:25', 'Unpaid', 1, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(35, 27, 8, 6, NULL, '2026-07-26 08:05:31', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(36, 29, 10, 6, NULL, '2026-06-02 08:51:43', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:48:56', 'Paid', NULL, 1, '2025-12-01 23:48:56', 3, NULL, NULL, NULL, 'PHP', NULL),
+(37, 30, 12, 5, NULL, '2026-11-30 13:19:52', 'Cancelled', 1000.00, NULL, 'technician is gay, sorry', NULL, 'No available technician', 0, '2026-11-24 09:18:17', '2026-11-26 08:07:19', 'Unpaid', 3, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (38, 24, 4, 3, NULL, '2025-11-30 09:34:42', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(39, 30, 9, 1, NULL, '2025-12-01 02:08:09', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(39, 30, 9, 1, NULL, '2026-12-01 02:08:09', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (40, 27, NULL, 5, NULL, '2025-12-18 18:48:14', 'Rejected', 1000.00, NULL, 'Automated cleanup: Missing cancellation details filled.', 'KAMAGONG', 'Other', 0, '2025-11-24 09:18:17', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (41, 20, 4, 4, NULL, '2025-10-29 14:03:24', 'Completed', 1200.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(42, 21, NULL, 8, NULL, '2025-12-19 21:52:34', 'Cancelled', 0.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', 1, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(43, 13, 9, 2, NULL, '2025-08-30 08:29:20', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(44, 19, NULL, 6, NULL, '2025-05-25 05:10:30', 'Cancelled', 2000.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-11-24 09:18:17', '2025-12-01 15:48:48', 'Unpaid', NULL, 1, '2025-12-01 23:48:48', 3, NULL, NULL, NULL, 'PHP', NULL),
-(45, 29, NULL, 3, NULL, '2025-07-24 09:30:24', 'Cancelled', 800.00, NULL, 'Customer reason: Emergency', NULL, 'Emergency', 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(46, 31, 8, 3, NULL, '2025-12-12 22:58:54', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(47, 23, 10, 6, NULL, '2025-10-19 02:59:56', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(48, 18, NULL, 3, NULL, '2025-12-06 08:58:44', 'Pending', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(49, 14, 10, 4, NULL, '2025-12-16 23:36:22', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(50, 30, NULL, 5, NULL, '2025-12-24 06:09:42', 'Rejected', 1000.00, NULL, NULL, 'bcos you\'re gay', 'Other', 0, '2025-11-24 09:18:17', '2025-11-26 10:29:53', 'Unpaid', NULL, 1, '2025-11-26 18:29:53', 1, NULL, NULL, NULL, 'PHP', NULL),
-(51, 25, 4, 2, NULL, '2025-12-09 12:34:19', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(52, 27, 9, 6, NULL, '2025-09-15 23:29:43', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(53, 31, 9, 5, NULL, '2025-05-24 14:24:02', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:48:45', 'Paid', NULL, 1, '2025-12-01 23:48:45', 3, NULL, NULL, NULL, 'PHP', NULL),
+(42, 21, NULL, 8, NULL, '2026-12-19 21:52:34', 'Cancelled', 0.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', 1, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(43, 13, 9, 2, NULL, '2026-08-30 08:29:20', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(44, 19, NULL, 6, NULL, '2026-05-25 05:10:30', 'Cancelled', 2000.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-11-24 09:18:17', '2026-12-01 15:48:48', 'Unpaid', NULL, 1, '2025-12-01 23:48:48', 3, NULL, NULL, NULL, 'PHP', NULL),
+(45, 29, NULL, 3, NULL, '2026-07-24 09:30:24', 'Cancelled', 800.00, NULL, 'Customer reason: Emergency', NULL, 'Emergency', 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(46, 31, 8, 3, NULL, '2026-12-12 22:58:54', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(47, 23, 10, 6, NULL, '2026-10-19 02:59:56', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(48, 18, NULL, 3, NULL, '2026-12-06 08:58:44', 'Pending', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(49, 14, 10, 4, NULL, '2026-12-16 23:36:22', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(50, 30, NULL, 5, NULL, '2026-12-24 06:09:42', 'Rejected', 1000.00, NULL, NULL, 'bcos you\'re gay', 'Other', 0, '2026-11-24 09:18:17', '2026-11-26 10:29:53', 'Unpaid', NULL, 1, '2025-11-26 18:29:53', 1, NULL, NULL, NULL, 'PHP', NULL),
+(51, 25, 4, 2, NULL, '2026-12-09 12:34:19', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(52, 27, 9, 6, NULL, '2026-09-15 23:29:43', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(53, 31, 9, 5, NULL, '2026-05-24 14:24:02', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:48:45', 'Paid', NULL, 1, '2025-12-01 23:48:45', 3, NULL, NULL, NULL, 'PHP', NULL),
 (54, 26, 4, 7, NULL, '2025-11-01 23:36:42', 'Completed', 500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(55, 23, 10, 2, NULL, '2025-10-03 19:13:00', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(55, 23, 10, 2, NULL, '2026-10-03 19:13:00', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (56, 21, 9, 1, NULL, '2025-10-10 16:09:08', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(57, 21, 12, 1, NULL, '2025-10-10 16:36:12', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(57, 21, 12, 1, NULL, '2026-10-10 16:36:12', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (58, 27, 12, 4, NULL, '2025-12-16 20:14:30', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(59, 26, 10, 6, NULL, '2025-07-19 13:20:51', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:49:39', 'Paid', NULL, 1, '2025-12-01 23:49:39', 3, NULL, NULL, NULL, 'PHP', NULL),
+(59, 26, 10, 6, NULL, '2026-07-19 13:20:51', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:49:39', 'Paid', NULL, 1, '2025-12-01 23:49:39', 3, NULL, NULL, NULL, 'PHP', NULL),
 (60, 2, 4, 3, 'Nasugbu, Batangas', '2025-07-29 19:22:37', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(61, 30, NULL, 8, NULL, '2025-12-21 08:44:20', 'Cancelled', 0.00, NULL, 'ayoko hahaha', NULL, 'Customer request', 0, '2025-11-24 09:18:17', '2025-11-26 11:36:46', 'Unpaid', 1, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(62, 14, NULL, 8, NULL, '2025-05-29 03:19:54', 'Cancelled', 0.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-11-24 09:18:17', '2025-12-01 15:48:49', 'Unpaid', NULL, 1, '2025-12-01 23:48:49', 3, NULL, NULL, NULL, 'PHP', NULL),
+(61, 30, NULL, 8, NULL, '2026-12-21 08:44:20', 'Cancelled', 0.00, NULL, 'ayoko hahaha', NULL, 'Customer request', 0, '2026-11-24 09:18:17', '2026-11-26 11:36:46', 'Unpaid', 1, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(62, 14, NULL, 8, NULL, '2026-05-29 03:19:54', 'Cancelled', 0.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-11-24 09:18:17', '2026-12-01 15:48:49', 'Unpaid', NULL, 1, '2025-12-01 23:48:49', 3, NULL, NULL, NULL, 'PHP', NULL),
 (63, 25, NULL, 4, NULL, '2025-10-19 23:01:52', 'Cancelled', 1200.00, NULL, 'Customer reason: Emergency', NULL, 'Emergency', 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (65, 30, NULL, 8, NULL, '2025-07-20 06:54:30', 'Cancelled', 0.00, NULL, 'Customer reason: Other', NULL, 'Other', 0, '2025-11-24 09:18:17', '2025-12-01 15:49:44', 'Unpaid', NULL, 1, '2025-12-01 23:49:44', 3, NULL, NULL, NULL, 'PHP', NULL),
-(66, 2, 4, 5, 'Nasugbu, Batangas', '2025-09-15 16:12:16', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(67, 29, 12, 1, NULL, '2025-08-25 22:05:19', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(68, 19, 9, 1, NULL, '2025-10-10 21:32:10', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(66, 2, 4, 5, 'Nasugbu, Batangas', '2026-09-15 16:12:16', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(67, 29, 12, 1, NULL, '2026-08-25 22:05:19', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(68, 19, 9, 1, NULL, '2026-10-10 21:32:10', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (69, 20, 4, 3, NULL, '2025-06-28 18:40:23', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(70, 13, 9, 2, NULL, '2025-09-05 05:26:27', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(71, 16, 10, 8, NULL, '2025-08-31 22:56:16', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(72, 13, 9, 5, NULL, '2025-11-01 12:58:42', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(73, 31, 4, 8, NULL, '2025-06-27 19:24:34', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:49:28', 'Paid', NULL, 1, '2025-12-01 23:49:28', 3, NULL, NULL, NULL, 'PHP', NULL),
-(74, 2, 4, 7, 'Nasugbu, Batangas', '2025-08-02 06:33:36', 'Completed', 500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(75, 24, NULL, 3, NULL, '2025-09-01 13:20:42', 'Cancelled', 800.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2025-11-24 09:18:17', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(76, 21, 4, 5, NULL, '2025-12-18 19:35:00', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(77, 28, 12, 6, NULL, '2025-10-02 09:25:25', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(70, 13, 9, 2, NULL, '2026-09-05 05:26:27', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(71, 16, 10, 8, NULL, '2026-08-31 22:56:16', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(72, 13, 9, 5, NULL, '2026-11-01 12:58:42', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(73, 31, 4, 8, NULL, '2026-06-27 19:24:34', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:49:28', 'Paid', NULL, 1, '2025-12-01 23:49:28', 3, NULL, NULL, NULL, 'PHP', NULL),
+(74, 2, 4, 7, 'Nasugbu, Batangas', '2026-08-02 06:33:36', 'Completed', 500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(75, 24, NULL, 3, NULL, '2026-09-01 13:20:42', 'Cancelled', 800.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2026-11-24 09:18:17', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(76, 21, 4, 5, NULL, '2026-12-18 19:35:00', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(77, 28, 12, 6, NULL, '2026-10-02 09:25:25', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (78, 2, 10, 2, 'Nasugbu, Batangas', '2025-12-11 17:48:42', 'Cancelled', 3000.00, NULL, 'ayaw ko na', NULL, 'Customer request', 0, '2025-11-24 09:18:17', '2025-11-28 13:52:30', 'Unpaid', 2, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (79, 26, NULL, 7, NULL, '2025-12-24 05:08:34', 'Cancelled', 500.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2025-11-24 09:18:17', '2025-12-01 04:32:57', 'Unpaid', 1, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(81, 32, 11, 6, NULL, '2025-11-11 11:46:59', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(82, 19, 11, 4, NULL, '2025-10-07 16:16:19', 'Completed', 1200.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(81, 32, 11, 6, NULL, '2026-11-11 11:46:59', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(82, 19, 11, 4, NULL, '2026-10-07 16:16:19', 'Completed', 1200.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (83, 17, 8, 8, NULL, '2025-07-12 12:08:04', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(85, 30, 9, 1, NULL, '2025-09-19 12:46:23', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(86, 16, 10, 5, NULL, '2025-11-15 05:08:39', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(87, 32, 4, 7, NULL, '2025-07-16 02:58:25', 'Completed', 500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(85, 30, 9, 1, NULL, '2026-09-19 12:46:23', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(86, 16, 10, 5, NULL, '2026-11-15 05:08:39', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(87, 32, 4, 7, NULL, '2026-07-16 02:58:25', 'Completed', 500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (88, 15, 4, 5, NULL, '2025-11-26 23:39:00', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-28 14:31:13', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(89, 26, 9, 1, NULL, '2025-06-14 09:16:56', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(90, 2, 11, 6, 'Nasugbu, Batangas', '2025-07-14 05:47:39', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(91, 25, 9, 7, NULL, '2025-12-22 09:24:29', 'Cancelled', 500.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-11-24 09:18:17', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(92, 16, 4, 3, NULL, '2025-09-23 10:37:52', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(93, 2, 4, 4, 'Nasugbu, Batangas', '2025-11-24 18:59:12', 'Cancelled', 1200.00, NULL, 'Conflict in sched', NULL, 'Scheduling conflict', 0, '2025-11-24 09:18:17', '2025-11-28 13:52:30', 'Unpaid', 3, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(94, 19, 4, 7, NULL, '2025-12-12 07:23:51', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(95, 27, 9, 2, NULL, '2025-08-11 23:57:33', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(89, 26, 9, 1, NULL, '2026-06-14 09:16:56', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(90, 2, 11, 6, 'Nasugbu, Batangas', '2026-07-14 05:47:39', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(91, 25, 9, 7, NULL, '2026-12-22 09:24:29', 'Cancelled', 500.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-11-24 09:18:17', '2026-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(92, 16, 4, 3, NULL, '2026-09-23 10:37:52', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(93, 2, 4, 4, 'Nasugbu, Batangas', '2026-11-24 18:59:12', 'Cancelled', 1200.00, NULL, 'Conflict in sched', NULL, 'Scheduling conflict', 0, '2026-11-24 09:18:17', '2026-11-28 13:52:30', 'Unpaid', 3, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(94, 19, 4, 7, NULL, '2026-12-12 07:23:51', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(95, 27, 9, 2, NULL, '2026-08-11 23:57:33', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (96, 29, NULL, 3, NULL, '2025-08-22 13:05:17', 'Cancelled', 800.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(97, 18, 11, 6, NULL, '2025-11-30 02:12:08', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(98, 32, 12, 5, NULL, '2025-09-20 11:39:56', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(97, 18, 11, 6, NULL, '2026-11-30 02:12:08', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(98, 32, 12, 5, NULL, '2026-09-20 11:39:56', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (99, 25, 12, 3, NULL, '2025-08-23 05:11:29', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(100, 29, 9, 2, NULL, '2025-09-22 21:09:58', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(101, 2, 11, 4, 'Nasugbu, Batangas', '2025-09-05 14:05:12', 'Completed', 1200.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(102, 22, 10, 2, NULL, '2025-11-02 10:26:41', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(103, 13, 8, 6, NULL, '2025-10-02 14:51:18', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(100, 29, 9, 2, NULL, '2026-09-22 21:09:58', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(101, 2, 11, 4, 'Nasugbu, Batangas', '2026-09-05 14:05:12', 'Completed', 1200.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(102, 22, 10, 2, NULL, '2026-11-02 10:26:41', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(103, 13, 8, 6, NULL, '2026-10-02 14:51:18', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (104, 29, 4, 8, NULL, '2025-12-18 02:42:48', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(105, 28, NULL, 5, NULL, '2025-11-22 18:32:42', 'Cancelled', 1000.00, NULL, 'Customer reason: Other', NULL, 'Other', 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(105, 28, NULL, 5, NULL, '2026-11-22 18:32:42', 'Cancelled', 1000.00, NULL, 'Customer reason: Other', NULL, 'Other', 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (106, 2, NULL, 1, 'Nasugbu, Batangas', '2025-06-09 02:54:47', 'Cancelled', 1500.00, NULL, 'Customer reason: Emergency', NULL, 'Emergency', 0, '2025-11-24 09:18:17', '2025-12-01 15:49:00', 'Unpaid', NULL, 1, '2025-12-01 23:49:00', 3, NULL, NULL, NULL, 'PHP', NULL),
-(107, 19, 11, 3, NULL, '2025-06-28 06:06:49', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:49:30', 'Paid', NULL, 1, '2025-12-01 23:49:30', 3, NULL, NULL, NULL, 'PHP', NULL),
-(108, 16, NULL, 1, NULL, '2025-09-03 03:17:03', 'Cancelled', 1500.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2025-11-24 09:18:17', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(107, 19, 11, 3, NULL, '2026-06-28 06:06:49', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:49:30', 'Paid', NULL, 1, '2025-12-01 23:49:30', 3, NULL, NULL, NULL, 'PHP', NULL),
+(108, 16, NULL, 1, NULL, '2026-09-03 03:17:03', 'Cancelled', 1500.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2026-11-24 09:18:17', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (109, 31, 11, 1, NULL, '2025-12-09 03:22:46', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(110, 16, 9, 7, NULL, '2025-07-01 16:54:30', 'Completed', 500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(111, 14, 8, 7, NULL, '2025-12-06 10:35:25', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(112, 32, 8, 8, NULL, '2025-10-06 12:25:52', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(113, 26, 9, 1, NULL, '2025-06-01 11:11:19', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:48:52', 'Paid', NULL, 1, '2025-12-01 23:48:52', 3, NULL, NULL, NULL, 'PHP', NULL),
-(114, 28, 8, 7, NULL, '2025-08-16 04:27:59', 'Completed', 500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(115, 19, 11, 5, NULL, '2025-09-06 12:58:07', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(116, 19, 10, 5, NULL, '2025-08-26 01:26:48', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(117, 14, 10, 6, NULL, '2025-11-09 18:26:50', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(118, 28, 10, 6, NULL, '2025-06-23 23:00:02', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:49:16', 'Paid', NULL, 1, '2025-12-01 23:49:16', 3, NULL, NULL, NULL, 'PHP', NULL),
-(119, 19, NULL, 3, NULL, '2025-09-28 04:48:25', 'Cancelled', 800.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-11-24 09:18:17', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(120, 29, 4, 6, NULL, '2025-11-13 04:34:28', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(121, 28, NULL, 5, NULL, '2025-12-21 14:05:05', 'Cancelled', 1000.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-11-24 09:18:17', '2025-12-01 15:56:51', 'Unpaid', 1, 1, '2025-12-01 23:56:51', 1, NULL, NULL, NULL, 'PHP', NULL),
-(122, 25, 4, 5, NULL, '2025-09-04 09:09:18', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(123, 32, 12, 8, NULL, '2025-06-26 02:34:03', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:49:26', 'Paid', NULL, 1, '2025-12-01 23:49:26', 3, NULL, NULL, NULL, 'PHP', NULL),
-(124, 2, 10, 2, 'Nasugbu, Batangas', '2025-08-03 02:04:41', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(125, 28, NULL, 4, NULL, '2025-10-04 07:24:31', 'Cancelled', 1200.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-11-24 09:18:17', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(126, 27, 8, 8, NULL, '2025-09-23 01:58:20', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(127, 21, NULL, 4, NULL, '2025-08-27 06:25:56', 'Cancelled', 1200.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-11-24 09:18:17', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(128, 28, 12, 4, NULL, '2025-11-01 04:00:07', 'Completed', 1200.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(129, 26, 8, 6, NULL, '2025-07-15 14:52:39', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(130, 2, 4, 3, 'Nasugbu, Batangas', '2025-08-29 18:04:43', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(131, 30, NULL, 2, NULL, '2025-06-19 19:19:59', 'Cancelled', 3000.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2025-11-24 09:18:17', '2025-12-01 15:49:20', 'Unpaid', NULL, 1, '2025-12-01 23:49:20', 3, NULL, NULL, NULL, 'PHP', NULL),
-(132, 24, 4, 4, NULL, '2025-07-27 04:55:06', 'Completed', 1200.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(133, 22, 8, 6, NULL, '2025-06-23 14:18:19', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:49:17', 'Paid', NULL, 1, '2025-12-01 23:49:17', 3, NULL, NULL, NULL, 'PHP', NULL),
-(134, 31, 10, 1, NULL, '2025-07-12 03:37:02', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:49:35', 'Paid', NULL, 1, '2025-12-01 23:49:35', 3, NULL, NULL, NULL, 'PHP', NULL),
-(135, 2, NULL, 2, 'Nasugbu, Batangas', '2025-12-07 08:42:36', 'Pending', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(136, 27, 12, 4, NULL, '2025-12-12 10:22:41', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(137, 25, 12, 4, NULL, '2025-06-09 21:15:50', 'Completed', 1200.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 15:49:04', 'Paid', NULL, 1, '2025-12-01 23:49:04', 3, NULL, NULL, NULL, 'PHP', NULL),
-(138, 2, 9, 5, 'Nasugbu, Batangas', '2025-05-31 16:54:18', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(139, 26, 12, 2, NULL, '2025-08-08 00:38:33', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(140, 31, NULL, 8, NULL, '2025-07-26 04:23:33', 'Cancelled', 0.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-11-24 09:18:17', '2025-12-01 15:49:42', 'Unpaid', NULL, 1, '2025-12-01 23:49:42', 3, NULL, NULL, NULL, 'PHP', NULL),
-(141, 31, 8, 8, NULL, '2025-09-04 01:54:41', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(142, 14, 11, 5, NULL, '2025-08-24 13:34:32', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(143, 20, NULL, 6, NULL, '2025-11-28 10:35:46', 'Pending', NULL, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(144, 19, 9, 7, NULL, '2025-08-31 15:57:03', 'Completed', 500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(145, 26, NULL, 2, NULL, '2025-08-04 03:04:56', 'Cancelled', 3000.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2025-11-24 09:18:17', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(146, 27, 8, 7, NULL, '2025-11-04 12:39:08', 'Completed', 500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-27 01:52:42', 'Paid', NULL, 1, '2025-11-27 09:52:42', 3, NULL, NULL, NULL, 'PHP', NULL),
-(147, 15, 12, 2, NULL, '2025-08-19 15:58:09', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(148, 16, 4, 6, NULL, '2025-06-20 08:33:42', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(149, 31, 9, 1, NULL, '2025-10-14 22:56:30', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(150, 30, 11, 8, NULL, '2025-10-17 08:42:38', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2025-11-24 09:18:17', '2025-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(151, 13, NULL, 1, NULL, '2025-11-26 22:22:00', 'Cancelled', NULL, 'poide pakabit cctv lods', 'Duplicate ka boss', NULL, 'Duplicate booking', 0, '2025-11-26 08:36:29', '2025-11-26 11:36:18', 'Unpaid', 1, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(152, 33, 4, 6, '123 Main St, Nasugbu, Batangas', '2025-11-26 21:41:00', 'Completed', 2547.30, '', NULL, NULL, NULL, 0, '2025-11-26 09:41:18', '2025-12-01 04:30:51', 'Unpaid', NULL, 1, '2025-11-26 17:41:54', 1, NULL, NULL, NULL, 'PHP', NULL),
-(153, 14, 4, 3, NULL, '2025-11-28 02:39:00', 'Cancelled', NULL, '', NULL, NULL, 'Scheduling conflict', 0, '2025-11-26 13:39:37', '2025-11-28 15:41:09', 'Unpaid', 4, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(154, 2, 4, 2, 'Nasugbu, Batangas', '2025-11-26 00:45:00', 'Completed', 2784.80, '', NULL, NULL, NULL, 0, '2025-11-26 13:45:59', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(155, 2, 4, 6, 'Nasugbu, Batangas', '2025-11-27 21:02:00', 'Confirmed', NULL, 'pakabit ng CCTV \n\nAddress: 123 Main St, Nasugbu, Batangas', NULL, NULL, NULL, 0, '2025-11-28 12:02:46', '2025-11-28 13:52:30', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(156, 2, 4, 3, 'Nasugbu, Batangas', '2025-11-27 22:06:00', 'Confirmed', NULL, 'pagawa cam \n\nAddress: Manila', NULL, NULL, NULL, 0, '2025-11-28 12:06:47', '2025-11-28 13:52:30', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(157, 2, NULL, 3, 'Nasugbu, Batangas', '2025-11-28 21:13:00', 'Confirmed', NULL, ' \n\nAddress: Manila', NULL, NULL, NULL, 0, '2025-11-28 12:13:59', '2025-11-28 13:52:30', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(158, 2, 4, 7, 'Nasugbu, Batangas', '2025-11-28 21:17:00', 'Completed', 599.50, ' \n\nAddress: Manilaz', NULL, NULL, NULL, 0, '2025-11-28 12:17:07', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(161, 2, 4, 6, 'Nasugbu, Batangas', '2025-11-28 22:12:00', 'Cancelled', NULL, 'KAMAGONG \n\nAddress: 123 Main St, Nasugbu, Batangas', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-11-28 13:12:45', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(162, 2, 4, 4, 'Nasugbu, Batangas', '2025-11-28 23:26:00', 'Cancelled', NULL, ' \n\nAddress: Manila', 'Walang tao', NULL, 'No available technician', 0, '2025-11-28 13:26:38', '2025-11-28 13:52:30', 'Unpaid', 4, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(163, 2, 4, 3, 'Tumalim, Nasugbu, Batangas', '2025-11-28 23:24:00', 'Completed', 818.47, 'pagawa po ng cam', NULL, NULL, NULL, 0, '2025-11-28 14:25:03', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(164, 2, 4, 3, 'Tumalim, Nasugbu, Batangas', '2025-11-28 23:59:00', 'Cancelled', NULL, '', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2025-11-28 15:40:01', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(165, 2, 4, 8, 'Nasugbu, Batangas', '2025-11-29 02:23:00', 'Completed', 0.00, '', NULL, NULL, NULL, 0, '2025-11-28 16:23:19', '2025-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(166, 2, 4, 3, 'Tumalim, Nasugbu, Batangas', '2025-12-01 12:55:00', 'Completed', 1200.00, '', NULL, NULL, NULL, 0, '2025-11-30 15:56:11', '2025-12-01 04:35:35', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(167, NULL, NULL, 7, 'Centro Tumalim', '2025-12-10 09:08:00', 'Pending', NULL, '', NULL, NULL, NULL, 1, '2025-12-01 00:09:10', '2025-12-01 00:09:10', 'Unpaid', NULL, 0, NULL, NULL, 'Bob Haha', '09287172363', '', 'PHP', NULL),
-(168, 2, 5, 6, 'Nasugbu, Batangas', '2025-11-30 10:21:00', 'Confirmed', NULL, '', NULL, NULL, NULL, 1, '2025-12-01 00:21:35', '2025-12-01 01:13:28', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(110, 16, 9, 7, NULL, '2026-07-01 16:54:30', 'Completed', 500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(111, 14, 8, 7, NULL, '2026-12-06 10:35:25', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(112, 32, 8, 8, NULL, '2026-10-06 12:25:52', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(113, 26, 9, 1, NULL, '2026-06-01 11:11:19', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:48:52', 'Paid', NULL, 1, '2025-12-01 23:48:52', 3, NULL, NULL, NULL, 'PHP', NULL),
+(114, 28, 8, 7, NULL, '2026-08-16 04:27:59', 'Completed', 500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(115, 19, 11, 5, NULL, '2026-09-06 12:58:07', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(116, 19, 10, 5, NULL, '2026-08-26 01:26:48', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(117, 14, 10, 6, NULL, '2026-11-09 18:26:50', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(118, 28, 10, 6, NULL, '2026-06-23 23:00:02', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:49:16', 'Paid', NULL, 1, '2025-12-01 23:49:16', 3, NULL, NULL, NULL, 'PHP', NULL),
+(119, 19, NULL, 3, NULL, '2026-09-28 04:48:25', 'Cancelled', 800.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-11-24 09:18:17', '2026-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(120, 29, 4, 6, NULL, '2026-11-13 04:34:28', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(121, 28, NULL, 5, NULL, '2026-12-21 14:05:05', 'Cancelled', 1000.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-11-24 09:18:17', '2026-12-01 15:56:51', 'Unpaid', 1, 1, '2025-12-01 23:56:51', 1, NULL, NULL, NULL, 'PHP', NULL),
+(122, 25, 4, 5, NULL, '2026-09-04 09:09:18', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(123, 32, 12, 8, NULL, '2026-06-26 02:34:03', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:49:26', 'Paid', NULL, 1, '2025-12-01 23:49:26', 3, NULL, NULL, NULL, 'PHP', NULL),
+(124, 2, 10, 2, 'Nasugbu, Batangas', '2026-08-03 02:04:41', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(125, 28, NULL, 4, NULL, '2026-10-04 07:24:31', 'Cancelled', 1200.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-11-24 09:18:17', '2026-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(126, 27, 8, 8, NULL, '2026-09-23 01:58:20', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(127, 21, NULL, 4, NULL, '2026-08-27 06:25:56', 'Cancelled', 1200.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-11-24 09:18:17', '2026-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(128, 28, 12, 4, NULL, '2026-11-01 04:00:07', 'Completed', 1200.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(129, 26, 8, 6, NULL, '2026-07-15 14:52:39', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(130, 2, 4, 3, 'Nasugbu, Batangas', '2026-08-29 18:04:43', 'Completed', 800.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(131, 30, NULL, 2, NULL, '2026-06-19 19:19:59', 'Cancelled', 3000.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2026-11-24 09:18:17', '2026-12-01 15:49:20', 'Unpaid', NULL, 1, '2025-12-01 23:49:20', 3, NULL, NULL, NULL, 'PHP', NULL),
+(132, 24, 4, 4, NULL, '2026-07-27 04:55:06', 'Completed', 1200.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(133, 22, 8, 6, NULL, '2026-06-23 14:18:19', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:49:17', 'Paid', NULL, 1, '2025-12-01 23:49:17', 3, NULL, NULL, NULL, 'PHP', NULL),
+(134, 31, 10, 1, NULL, '2026-07-12 03:37:02', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:49:35', 'Paid', NULL, 1, '2025-12-01 23:49:35', 3, NULL, NULL, NULL, 'PHP', NULL),
+(135, 2, NULL, 2, 'Nasugbu, Batangas', '2026-12-07 08:42:36', 'Pending', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(136, 27, 12, 4, NULL, '2026-12-12 10:22:41', 'Confirmed', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(137, 25, 12, 4, NULL, '2026-06-09 21:15:50', 'Completed', 1200.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 15:49:04', 'Paid', NULL, 1, '2025-12-01 23:49:04', 3, NULL, NULL, NULL, 'PHP', NULL),
+(138, 2, 9, 5, 'Nasugbu, Batangas', '2026-05-31 16:54:18', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-28 13:52:30', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(139, 26, 12, 2, NULL, '2026-08-08 00:38:33', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(140, 31, NULL, 8, NULL, '2026-07-26 04:23:33', 'Cancelled', 0.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-11-24 09:18:17', '2026-12-01 15:49:42', 'Unpaid', NULL, 1, '2025-12-01 23:49:42', 3, NULL, NULL, NULL, 'PHP', NULL),
+(141, 31, 8, 8, NULL, '2026-09-04 01:54:41', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(142, 14, 11, 5, NULL, '2026-08-24 13:34:32', 'Completed', 1000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(143, 20, NULL, 6, NULL, '2026-11-28 10:35:46', 'Pending', NULL, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(144, 19, 9, 7, NULL, '2026-08-31 15:57:03', 'Completed', 500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(145, 26, NULL, 2, NULL, '2026-08-04 03:04:56', 'Cancelled', 3000.00, NULL, 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2026-11-24 09:18:17', '2026-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(146, 27, 8, 7, NULL, '2026-11-04 12:39:08', 'Completed', 500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-27 01:52:42', 'Paid', NULL, 1, '2025-11-27 09:52:42', 3, NULL, NULL, NULL, 'PHP', NULL),
+(147, 15, 12, 2, NULL, '2026-08-19 15:58:09', 'Completed', 3000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(148, 16, 4, 6, NULL, '2026-06-20 08:33:42', 'Completed', 2000.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(149, 31, 9, 1, NULL, '2026-10-14 22:56:30', 'Completed', 1500.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(150, 30, 11, 8, NULL, '2026-10-17 08:42:38', 'Completed', 0.00, NULL, NULL, NULL, NULL, 0, '2026-11-24 09:18:17', '2026-11-24 09:18:17', 'Paid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(151, 13, NULL, 1, NULL, '2026-11-26 22:22:00', 'Cancelled', NULL, 'poide pakabit cctv lods', 'Duplicate ka boss', NULL, 'Duplicate booking', 0, '2026-11-26 08:36:29', '2026-11-26 11:36:18', 'Unpaid', 1, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(152, 33, 4, 6, '123 Main St, Nasugbu, Batangas', '2026-11-26 21:41:00', 'Completed', 2547.30, '', NULL, NULL, NULL, 0, '2026-11-26 09:41:18', '2026-12-01 04:30:51', 'Unpaid', NULL, 1, '2025-11-26 17:41:54', 1, NULL, NULL, NULL, 'PHP', NULL),
+(153, 14, 4, 3, NULL, '2026-11-28 02:39:00', 'Cancelled', NULL, '', NULL, NULL, 'Scheduling conflict', 0, '2026-11-26 13:39:37', '2026-11-28 15:41:09', 'Unpaid', 4, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(154, 2, 4, 2, 'Nasugbu, Batangas', '2026-11-26 00:45:00', 'Completed', 2784.80, '', NULL, NULL, NULL, 0, '2026-11-26 13:45:59', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(155, 2, 4, 6, 'Nasugbu, Batangas', '2026-11-27 21:02:00', 'Confirmed', NULL, 'pakabit ng CCTV \n\nAddress: 123 Main St, Nasugbu, Batangas', NULL, NULL, NULL, 0, '2026-11-28 12:02:46', '2026-11-28 13:52:30', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(156, 2, 4, 3, 'Nasugbu, Batangas', '2026-11-27 22:06:00', 'Confirmed', NULL, 'pagawa cam \n\nAddress: Manila', NULL, NULL, NULL, 0, '2026-11-28 12:06:47', '2026-11-28 13:52:30', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(157, 2, NULL, 3, 'Nasugbu, Batangas', '2026-11-28 21:13:00', 'Confirmed', NULL, ' \n\nAddress: Manila', NULL, NULL, NULL, 0, '2026-11-28 12:13:59', '2026-11-28 13:52:30', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(158, 2, 4, 7, 'Nasugbu, Batangas', '2026-11-28 21:17:00', 'Completed', 599.50, ' \n\nAddress: Manilaz', NULL, NULL, NULL, 0, '2026-11-28 12:17:07', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(161, 2, 4, 6, 'Nasugbu, Batangas', '2026-11-28 22:12:00', 'Cancelled', NULL, 'KAMAGONG \n\nAddress: 123 Main St, Nasugbu, Batangas', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-11-28 13:12:45', '2026-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(162, 2, 4, 4, 'Nasugbu, Batangas', '2026-11-28 23:26:00', 'Cancelled', NULL, ' \n\nAddress: Manila', 'Walang tao', NULL, 'No available technician', 0, '2026-11-28 13:26:38', '2026-11-28 13:52:30', 'Unpaid', 4, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(163, 2, 4, 3, 'Tumalim, Nasugbu, Batangas', '2026-11-28 23:24:00', 'Completed', 818.47, 'pagawa po ng cam', NULL, NULL, NULL, 0, '2026-11-28 14:25:03', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(164, 2, 4, 3, 'Tumalim, Nasugbu, Batangas', '2026-11-28 23:59:00', 'Cancelled', NULL, '', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2026-11-28 15:40:01', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(165, 2, 4, 8, 'Nasugbu, Batangas', '2026-11-29 02:23:00', 'Completed', 0.00, '', NULL, NULL, NULL, 0, '2026-11-28 16:23:19', '2026-12-01 04:30:51', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(166, 2, 4, 3, 'Tumalim, Nasugbu, Batangas', '2026-12-01 12:55:00', 'Completed', 1200.00, '', NULL, NULL, NULL, 0, '2026-11-30 15:56:11', '2026-12-01 04:35:35', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(167, NULL, NULL, 7, 'Centro Tumalim', '2026-12-10 09:08:00', 'Pending', NULL, '', NULL, NULL, NULL, 1, '2026-12-01 00:09:10', '2026-12-01 00:09:10', 'Unpaid', NULL, 0, NULL, NULL, 'Bob Haha', '09287172363', '', 'PHP', NULL),
+(168, 2, 5, 6, 'Nasugbu, Batangas', '2026-11-30 10:21:00', 'Confirmed', NULL, '', NULL, NULL, NULL, 1, '2026-12-01 00:21:35', '2026-12-01 01:13:28', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (169, 13, 5, 6, 'Paraig Batangas', '2025-12-03 10:09:00', 'Confirmed', NULL, '', NULL, NULL, NULL, 1, '2025-12-01 01:10:05', '2025-12-01 02:33:46', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(170, 2, NULL, 5, 'Nasugbu, Batangas', '2025-12-07 07:52:00', 'Pending', NULL, '', NULL, NULL, NULL, 0, '2025-12-01 01:53:00', '2025-12-01 01:53:00', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(171, 33, 10, 2, NULL, '2025-11-17 12:32:57', 'Completed', 2485.22, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(172, 24, 8, 6, NULL, '2025-11-16 12:32:57', 'Completed', 2266.88, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(173, 26, 12, 5, NULL, '2025-11-26 12:32:57', 'Completed', 1007.26, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(174, 14, 9, 7, NULL, '2025-11-15 12:32:57', 'Completed', 593.46, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(175, 16, 8, 4, NULL, '2025-11-30 12:32:57', 'Completed', 1273.23, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(170, 2, NULL, 5, 'Nasugbu, Batangas', '2026-12-07 07:52:00', 'Pending', NULL, '', NULL, NULL, NULL, 0, '2026-12-01 01:53:00', '2026-12-01 01:53:00', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(171, 33, 10, 2, NULL, '2026-11-17 12:32:57', 'Completed', 2485.22, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(172, 24, 8, 6, NULL, '2026-11-16 12:32:57', 'Completed', 2266.88, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(173, 26, 12, 5, NULL, '2026-11-26 12:32:57', 'Completed', 1007.26, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(174, 14, 9, 7, NULL, '2026-11-15 12:32:57', 'Completed', 593.46, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(175, 16, 8, 4, NULL, '2026-11-30 12:32:57', 'Completed', 1273.23, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (176, 31, 4, 6, NULL, '2025-11-02 12:32:57', 'Completed', 2534.61, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(177, 17, 5, 3, NULL, '2025-11-15 12:32:57', 'Completed', 1020.49, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(178, 25, 9, 5, NULL, '2025-11-17 12:32:57', 'Completed', 911.02, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(179, 19, 10, 8, NULL, '2025-11-25 12:32:57', 'Completed', 0.00, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(180, 29, 8, 6, NULL, '2025-11-09 12:32:57', 'Completed', 2472.41, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(177, 17, 5, 3, NULL, '2026-11-15 12:32:57', 'Completed', 1020.49, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(178, 25, 9, 5, NULL, '2026-11-17 12:32:57', 'Completed', 911.02, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(179, 19, 10, 8, NULL, '2026-11-25 12:32:57', 'Completed', 0.00, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(180, 29, 8, 6, NULL, '2026-11-09 12:32:57', 'Completed', 2472.41, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (181, 2, 5, 8, NULL, '2025-11-16 12:32:57', 'Completed', 0.00, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(182, 2, 9, 8, NULL, '2025-11-30 12:32:57', 'Completed', 0.00, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(182, 2, 9, 8, NULL, '2026-11-30 12:32:57', 'Completed', 0.00, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (183, 30, 9, 4, NULL, '2025-11-14 12:32:57', 'Completed', 1173.96, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (184, 16, 4, 2, NULL, '2025-11-24 12:32:57', 'Completed', 2543.97, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (185, 20, 9, 4, NULL, '2025-11-10 12:32:57', 'Completed', 1450.12, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (186, 27, 9, 7, NULL, '2025-11-23 12:32:57', 'Completed', 498.64, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(187, 21, 8, 2, NULL, '2025-11-27 12:32:57', 'Completed', 3014.19, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(188, 28, 9, 1, NULL, '2025-11-21 12:32:57', 'Completed', 1726.42, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(187, 21, 8, 2, NULL, '2026-11-27 12:32:57', 'Completed', 3014.19, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(188, 28, 9, 1, NULL, '2026-11-21 12:32:57', 'Completed', 1726.42, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (189, 15, 4, 5, NULL, '2025-11-07 12:32:57', 'Completed', 1033.30, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (190, 32, 11, 6, NULL, '2025-11-02 12:32:57', 'Completed', 2158.21, 'Seeded completed appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(202, 14, NULL, 6, NULL, '2025-11-09 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-12-01 04:32:57', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(203, 26, NULL, 7, NULL, '2025-11-17 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-12-01 04:32:57', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(202, 14, NULL, 6, NULL, '2026-11-09 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-12-01 04:32:57', '2026-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(203, 26, NULL, 7, NULL, '2026-11-17 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-12-01 04:32:57', '2026-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (204, 2, NULL, 1, NULL, '2025-11-04 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Seeded cancellation', NULL, 'Duplicate booking', 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(205, 15, NULL, 8, NULL, '2025-11-06 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2025-12-01 04:32:57', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(206, 21, NULL, 1, NULL, '2025-11-20 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-12-01 04:32:57', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(207, 20, NULL, 4, NULL, '2025-11-09 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2025-12-01 04:32:57', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(205, 15, NULL, 8, NULL, '2026-11-06 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2026-12-01 04:32:57', '2026-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(206, 21, NULL, 1, NULL, '2026-11-20 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-12-01 04:32:57', '2026-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(207, 20, NULL, 4, NULL, '2026-11-09 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2026-12-01 04:32:57', '2026-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (208, 33, NULL, 5, NULL, '2025-11-09 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2025-12-01 04:32:57', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(209, 14, NULL, 7, NULL, '2025-11-28 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-12-01 04:32:57', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(210, 27, NULL, 7, NULL, '2025-11-16 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-12-01 04:32:57', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(209, 14, NULL, 7, NULL, '2026-11-28 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-12-01 04:32:57', '2026-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(210, 27, NULL, 7, NULL, '2026-11-16 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-12-01 04:32:57', '2026-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (211, 33, NULL, 3, NULL, '2025-11-18 12:32:57', 'Cancelled', NULL, 'Seeded cancelled appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-12-01 04:32:57', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (217, 28, NULL, 5, NULL, '2025-11-03 12:32:57', 'Rejected', NULL, 'Seeded rejected appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-12-01 04:32:57', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (218, 20, NULL, 8, NULL, '2025-11-02 12:32:57', 'Rejected', NULL, 'Seeded rejected appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-12-01 04:32:57', '2025-12-01 15:57:03', 'Unpaid', NULL, 1, '2025-12-01 23:57:03', 1, NULL, NULL, NULL, 'PHP', NULL),
 (219, 24, NULL, 1, NULL, '2025-11-25 12:32:57', 'Rejected', NULL, 'Seeded rejected appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-12-01 04:32:57', '2025-12-01 12:28:45', 'Unpaid', NULL, 1, '2025-12-01 20:28:45', 1, NULL, NULL, NULL, 'PHP', NULL),
 (220, 22, NULL, 6, NULL, '2025-11-26 12:32:57', 'Rejected', NULL, 'Seeded rejected appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2025-12-01 04:32:57', '2025-12-01 12:28:44', 'Unpaid', NULL, 1, '2025-12-01 20:28:44', 1, NULL, NULL, NULL, 'PHP', NULL),
-(221, 31, NULL, 5, NULL, '2025-11-13 12:32:57', 'Rejected', NULL, 'Seeded rejected appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-12-01 04:32:57', '2025-12-01 12:28:46', 'Unpaid', NULL, 1, '2025-12-01 20:28:46', 1, NULL, NULL, NULL, 'PHP', NULL),
-(223, 27, NULL, 8, NULL, '2025-11-17 12:32:57', 'Rejected', NULL, 'Seeded rejected appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-12-01 04:32:57', '2025-12-01 12:28:45', 'Unpaid', NULL, 1, '2025-12-01 20:28:45', 1, NULL, NULL, NULL, 'PHP', NULL),
-(224, 21, NULL, 7, NULL, '2025-11-09 12:32:57', 'Rejected', NULL, 'Seeded rejected appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2025-12-01 04:32:57', '2025-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(221, 31, NULL, 5, NULL, '2026-11-13 12:32:57', 'Rejected', NULL, 'Seeded rejected appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-12-01 04:32:57', '2026-12-01 12:28:46', 'Unpaid', NULL, 1, '2025-12-01 20:28:46', 1, NULL, NULL, NULL, 'PHP', NULL),
+(223, 27, NULL, 8, NULL, '2026-11-17 12:32:57', 'Rejected', NULL, 'Seeded rejected appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-12-01 04:32:57', '2026-12-01 12:28:45', 'Unpaid', NULL, 1, '2025-12-01 20:28:45', 1, NULL, NULL, NULL, 'PHP', NULL),
+(224, 21, NULL, 7, NULL, '2026-11-09 12:32:57', 'Rejected', NULL, 'Seeded rejected appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Other', 0, '2026-12-01 04:32:57', '2026-12-01 04:46:37', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (225, 26, NULL, 5, NULL, '2025-11-06 12:32:57', 'Rejected', NULL, 'Seeded rejected appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2025-12-01 04:32:57', '2025-12-01 15:57:06', 'Unpaid', NULL, 1, '2025-12-01 23:57:06', 1, NULL, NULL, NULL, 'PHP', NULL),
-(226, 29, NULL, 4, NULL, '2025-11-30 12:32:57', 'Rejected', NULL, 'Seeded rejected appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2025-12-01 04:32:57', '2025-12-01 12:28:43', 'Unpaid', NULL, 1, '2025-12-01 20:28:43', 1, NULL, NULL, NULL, 'PHP', NULL),
-(232, 18, NULL, 4, NULL, '2025-12-06 12:32:57', 'Pending', NULL, 'Seeded future appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(233, 13, NULL, 2, NULL, '2025-12-13 12:32:57', 'Confirmed', NULL, 'Seeded future appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(234, 20, NULL, 8, NULL, '2025-12-13 12:32:57', 'Pending', NULL, 'Seeded future appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(226, 29, NULL, 4, NULL, '2026-11-30 12:32:57', 'Rejected', NULL, 'Seeded rejected appointment', 'Automated cleanup: Missing cancellation details filled.', NULL, 'Duplicate booking', 0, '2026-12-01 04:32:57', '2026-12-01 12:28:43', 'Unpaid', NULL, 1, '2025-12-01 20:28:43', 1, NULL, NULL, NULL, 'PHP', NULL),
+(232, 18, NULL, 4, NULL, '2026-12-06 12:32:57', 'Pending', NULL, 'Seeded future appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(233, 13, NULL, 2, NULL, '2026-12-13 12:32:57', 'Confirmed', NULL, 'Seeded future appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(234, 20, NULL, 8, NULL, '2026-12-13 12:32:57', 'Pending', NULL, 'Seeded future appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (236, 14, NULL, 5, NULL, '2025-12-07 12:32:57', 'Pending', NULL, 'Seeded future appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(237, 13, NULL, 8, NULL, '2025-12-10 12:32:57', 'Pending', NULL, 'Seeded future appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(238, 24, NULL, 6, NULL, '2025-12-05 12:32:57', 'Confirmed', NULL, 'Seeded future appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(237, 13, NULL, 8, NULL, '2026-12-10 12:32:57', 'Pending', NULL, 'Seeded future appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(238, 24, NULL, 6, NULL, '2026-12-05 12:32:57', 'Confirmed', NULL, 'Seeded future appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (239, 29, NULL, 2, NULL, '2025-12-05 12:32:57', 'Pending', NULL, 'Seeded future appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(240, 19, NULL, 3, NULL, '2025-12-06 12:32:57', 'Confirmed', NULL, 'Seeded future appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(240, 19, NULL, 3, NULL, '2026-12-06 12:32:57', 'Confirmed', NULL, 'Seeded future appointment', NULL, NULL, NULL, 0, '2026-12-01 04:32:57', '2026-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
 (241, 24, NULL, 1, NULL, '2025-12-02 12:32:57', 'Pending', NULL, 'Seeded future appointment', NULL, NULL, NULL, 0, '2025-12-01 04:32:57', '2025-12-01 04:32:57', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(247, 2, 4, 3, 'Nasugbu, Batangas', '2025-12-04 21:28:00', 'Cancelled', NULL, '', 'Repair tools under maintenance', NULL, '', 0, '2025-12-01 12:28:13', '2025-12-01 15:56:42', 'Unpaid', 4, 1, '2025-12-01 23:56:42', 1, NULL, NULL, NULL, 'PHP', NULL),
+(247, 2, 4, 3, 'Nasugbu, Batangas', '2026-12-04 21:28:00', 'Cancelled', NULL, '', 'Repair tools under maintenance', NULL, '', 0, '2026-12-01 12:28:13', '2026-12-01 15:56:42', 'Unpaid', 4, 1, '2025-12-01 23:56:42', 1, NULL, NULL, NULL, 'PHP', NULL),
 (248, 2, 4, 3, 'Tumalim, Nasugbu, Batangas', '2025-12-04 21:32:00', 'Cancelled', NULL, '', NULL, NULL, NULL, 0, '2025-12-01 14:32:28', '2025-12-01 15:56:48', 'Unpaid', NULL, 1, '2025-12-01 23:56:48', 1, NULL, NULL, NULL, 'PHP', NULL),
-(251, 2, NULL, 3, 'Nasugbu, Batangas', '2025-12-04 11:00:00', 'Cancelled', NULL, '', 'Wrong input', NULL, 'Scheduling conflict', 0, '2025-12-01 15:00:55', '2025-12-01 15:56:45', 'Unpaid', 2, 1, '2025-12-01 23:56:45', 1, NULL, NULL, NULL, 'PHP', NULL),
-(252, 2, 4, 3, 'Nasugbu, Batangas', '2025-12-04 11:01:00', 'Confirmed', NULL, '', NULL, NULL, NULL, 0, '2025-12-01 15:01:06', '2025-12-01 15:02:04', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
-(254, 2, NULL, 5, 'Nasugbu, Batangas', '2025-12-02 11:34:00', 'Pending', NULL, '', NULL, NULL, NULL, 0, '2025-12-01 16:34:43', '2025-12-01 16:34:43', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL);
+(251, 2, NULL, 3, 'Nasugbu, Batangas', '2026-12-04 11:00:00', 'Cancelled', NULL, '', 'Wrong input', NULL, 'Scheduling conflict', 0, '2026-12-01 15:00:55', '2026-12-01 15:56:45', 'Unpaid', 2, 1, '2025-12-01 23:56:45', 1, NULL, NULL, NULL, 'PHP', NULL),
+(252, 2, 4, 3, 'Nasugbu, Batangas', '2025-12-04 11:01:00', 'Cancelled', NULL, '', NULL, NULL, 'No available technician', 0, '2025-12-01 15:01:06', '2026-05-26 22:57:33', 'Unpaid', 4, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(255, 2, NULL, 5, 'Nasugbu, Batangas', '2026-05-27 11:50:00', 'Cancelled', NULL, '', 'emergency', NULL, 'Emergency', 0, '2026-05-26 23:50:27', '2026-05-26 23:54:35', 'Unpaid', 2, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(256, 2, 4, 5, 'Nasugbu, Batangas', '2026-05-27 11:54:00', 'Completed', 1000.00, '', NULL, NULL, NULL, 0, '2026-05-26 23:54:50', '2026-05-27 00:00:18', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(257, 20, 4, 5, 'Tumalim, Nasugbu, Batangas', '2026-05-27 11:11:00', 'Completed', 5000.00, '', NULL, NULL, NULL, 0, '2026-05-27 00:11:47', '2026-05-27 00:12:54', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL),
+(258, 23, 4, 5, 'Lian, Batangas', '2026-05-27 13:05:00', 'Completed', 5000.00, '', NULL, NULL, NULL, 0, '2026-05-27 03:05:20', '2026-05-27 03:06:34', 'Unpaid', NULL, 0, NULL, NULL, NULL, NULL, NULL, 'PHP', NULL);
 
 --
 -- Triggers `appointments`
@@ -406,21 +374,45 @@ DELIMITER ;
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `appointment_parts`
+--
+
+CREATE TABLE `appointment_parts` (
+  `appointment_id` int NOT NULL,
+  `item_id` int NOT NULL,
+  `quantity` decimal(10,2) NOT NULL,
+  `unit_price` decimal(10,2) DEFAULT '0.00',
+  `line_total` decimal(10,2) DEFAULT '0.00',
+  `note` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `appointment_parts`
+--
+
+INSERT INTO `appointment_parts` (`appointment_id`, `item_id`, `quantity`, `unit_price`, `line_total`, `note`, `created_at`) VALUES
+(257, 63, 1.00, 4000.00, 4000.00, NULL, '2026-05-27 00:12:54'),
+(258, 63, 1.00, 4000.00, 4000.00, NULL, '2026-05-27 03:06:34');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `audit_logs`
 --
 
 CREATE TABLE `audit_logs` (
-  `log_id` int(11) NOT NULL,
-  `user_id` int(11) DEFAULT NULL,
-  `actor_role` varchar(50) DEFAULT NULL,
-  `actor_username` varchar(150) DEFAULT NULL,
-  `action` varchar(50) NOT NULL,
-  `table_name` varchar(128) NOT NULL,
-  `record_id` int(11) DEFAULT NULL,
-  `changes` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`changes`)),
-  `user_agent` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  `log_id` int NOT NULL,
+  `user_id` int DEFAULT NULL,
+  `actor_role` varchar(50) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `actor_username` varchar(150) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `action` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
+  `table_name` varchar(128) COLLATE utf8mb4_general_ci NOT NULL,
+  `record_id` int DEFAULT NULL,
+  `changes` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin,
+  `user_agent` text COLLATE utf8mb4_general_ci,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ;
 
 --
 -- Dumping data for table `audit_logs`
@@ -1084,7 +1076,211 @@ INSERT INTO `audit_logs` (`log_id`, `user_id`, `actor_role`, `actor_username`, `
 (838, NULL, NULL, NULL, 'DELETE', 'appointments', 64, '{\"old\": {\"status\": \"Cancelled\", \"date\": \"2025-08-28 12:08:27\"}}', NULL, '2025-12-01 15:57:25'),
 (839, 2, 'Customer', NULL, 'CREATE', 'appointments', 254, '{\"new\": {\"status\": \"Pending\", \"date\": \"2025-12-02 11:34:00\", \"customer_id\": 2}}', NULL, '2025-12-01 16:34:43'),
 (840, 3, 'Receptionist', NULL, 'UPDATE', 'appointments', 235, '{\"old\": {\"status\": \"Cancelled\", \"date\": \"2025-12-02 12:32:57\", \"technician_id\": 4}, \"new\": {\"status\": \"Cancelled\", \"date\": \"2025-12-02 12:32:57\", \"technician_id\": 4}}', NULL, '2025-12-01 16:39:03'),
-(841, 1, 'Admin', NULL, 'DELETE', 'appointments', 235, '{\"old\": {\"status\": \"Cancelled\", \"date\": \"2025-12-02 12:32:57\"}}', NULL, '2025-12-01 16:39:07');
+(841, 1, 'Admin', NULL, 'DELETE', 'appointments', 235, '{\"old\": {\"status\": \"Cancelled\", \"date\": \"2025-12-02 12:32:57\"}}', NULL, '2025-12-01 16:39:07'),
+(842, 3, 'Receptionist', NULL, 'UPDATE', 'users', 3, '{\"new\": {\"role\": \"Receptionist\", \"email\": \"joyce@gmail.com\", \"last_name\": \"Corpus\", \"first_name\": \"Joyce\"}, \"old\": {\"role\": \"Receptionist\", \"email\": \"denmark@gmail.com\", \"last_name\": \"Cabanhao\", \"first_name\": \"Denmark\"}}', NULL, '2026-05-26 13:19:24'),
+(843, 2, 'Customer', NULL, 'UPDATE', 'users', 2, '{\"new\": {\"role\": \"Customer\", \"email\": \"clyde@gmail.com\", \"last_name\": \"Brucal\", \"first_name\": \"Clyde Allen\"}, \"old\": {\"role\": \"Customer\", \"email\": \"edrian@gmail.com\", \"last_name\": \"Balingbing\", \"first_name\": \"Edrian\"}}', NULL, '2026-05-26 13:21:50'),
+(844, 4, 'Technician', NULL, 'UPDATE', 'users', 4, '{\"new\": {\"role\": \"Technician\", \"email\": \"emman@gmail.com\", \"last_name\": \"Esguerra\", \"first_name\": \"Emman\"}, \"old\": {\"role\": \"Technician\", \"email\": \"glenn@gmail.com\", \"last_name\": \"Mikko\", \"first_name\": \"Glenn\"}}', NULL, '2026-05-26 13:23:06'),
+(845, 4, 'Technician', NULL, 'UPDATE', 'users', 4, '{\"new\": {\"role\": \"Technician\", \"email\": \"emman@gmail.com\", \"last_name\": \"Esguerra\", \"first_name\": \"Emman\"}, \"old\": {\"role\": \"Technician\", \"email\": \"emman@gmail.com\", \"last_name\": \"Esguerra\", \"first_name\": \"Emman\"}}', NULL, '2026-05-26 13:33:43'),
+(846, 3, 'Receptionist', NULL, 'UPDATE', 'users', 3, '{\"new\": {\"role\": \"Receptionist\", \"email\": \"joyce@gmail.com\", \"last_name\": \"Corpus\", \"first_name\": \"Joyce\"}, \"old\": {\"role\": \"Receptionist\", \"email\": \"joyce@gmail.com\", \"last_name\": \"Corpus\", \"first_name\": \"Joyce\"}}', NULL, '2026-05-26 14:05:45'),
+(847, 2, 'Customer', NULL, 'UPDATE', 'appointments', 254, '{\"new\": {\"date\": \"2026-05-27 23:34:00.000000\", \"status\": \"Pending\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-02 11:34:00.000000\", \"status\": \"Pending\", \"technician_id\": null}}', NULL, '2026-05-26 14:46:31'),
+(848, 3, 'Receptionist', NULL, 'UPDATE', 'appointments', 254, '{\"new\": {\"date\": \"2026-05-27 23:34:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}, \"old\": {\"date\": \"2026-05-27 23:34:00.000000\", \"status\": \"Pending\", \"technician_id\": null}}', NULL, '2026-05-26 14:47:02'),
+(849, 4, 'Technician', NULL, 'UPDATE', 'appointments', 254, '{\"new\": {\"date\": \"2026-05-27 23:34:00.000000\", \"status\": \"In Progress\", \"technician_id\": 4}, \"old\": {\"date\": \"2026-05-27 23:34:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}}', NULL, '2026-05-26 14:47:20'),
+(850, 4, 'Technician', NULL, 'UPDATE', 'appointments', 252, '{\"new\": {\"date\": \"2025-12-04 11:01:00.000000\", \"status\": \"In Progress\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-12-04 11:01:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}}', NULL, '2026-05-26 22:57:24'),
+(851, 4, 'Technician', NULL, 'UPDATE', 'appointments', 252, '{\"new\": {\"date\": \"2025-12-04 11:01:00.000000\", \"status\": \"Cancelled\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-12-04 11:01:00.000000\", \"status\": \"In Progress\", \"technician_id\": 4}}', NULL, '2026-05-26 22:57:33'),
+(852, 2, 'Customer', NULL, 'UPDATE', 'users', 2, '{\"new\": {\"role\": \"Customer\", \"email\": \"clyde@gmail.com\", \"last_name\": \"Villaflor\", \"first_name\": \"Jason\"}, \"old\": {\"role\": \"Customer\", \"email\": \"clyde@gmail.com\", \"last_name\": \"Brucal\", \"first_name\": \"Clyde Allen\"}}', NULL, '2026-05-26 23:49:26'),
+(853, NULL, NULL, NULL, 'DELETE', 'appointments', 254, '{\"old\": {\"date\": \"2026-05-27 23:34:00.000000\", \"status\": \"In Progress\"}}', NULL, '2026-05-26 23:50:07'),
+(854, 2, 'Customer', NULL, 'CREATE', 'appointments', 255, '{\"new\": {\"date\": \"2026-05-27 11:50:00.000000\", \"status\": \"Pending\", \"customer_id\": 2}}', NULL, '2026-05-26 23:50:27'),
+(855, 2, 'Customer', NULL, 'UPDATE', 'appointments', 255, '{\"new\": {\"date\": \"2026-05-27 11:50:00.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2026-05-27 11:50:00.000000\", \"status\": \"Pending\", \"technician_id\": null}}', NULL, '2026-05-26 23:54:35'),
+(856, 2, 'Customer', NULL, 'CREATE', 'appointments', 256, '{\"new\": {\"date\": \"2026-05-27 11:54:00.000000\", \"status\": \"Pending\", \"customer_id\": 2}}', NULL, '2026-05-26 23:54:50'),
+(857, 1, 'Admin', NULL, 'UPDATE', 'appointments', 256, '{\"new\": {\"date\": \"2026-05-27 11:54:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}, \"old\": {\"date\": \"2026-05-27 11:54:00.000000\", \"status\": \"Pending\", \"technician_id\": null}}', NULL, '2026-05-26 23:55:00'),
+(858, 1, 'Admin', NULL, 'UPDATE', 'appointments', 256, '{\"status\":\"Confirmed\",\"note\":\"Appointment #256 was confirmed\"}', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', '2026-05-26 23:55:00'),
+(859, 4, 'Technician', NULL, 'UPDATE', 'appointments', 256, '{\"new\": {\"date\": \"2026-05-27 11:54:00.000000\", \"status\": \"In Progress\", \"technician_id\": 4}, \"old\": {\"date\": \"2026-05-27 11:54:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}}', NULL, '2026-05-26 23:55:10'),
+(860, 4, 'Technician', NULL, 'UPDATE', 'appointments', 256, '{\"new\": {\"date\": \"2026-05-27 11:54:00.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2026-05-27 11:54:00.000000\", \"status\": \"In Progress\", \"technician_id\": 4}}', NULL, '2026-05-27 00:00:18'),
+(861, 20, 'Customer', NULL, 'CREATE', 'appointments', 257, '{\"new\": {\"date\": \"2026-05-27 11:11:00.000000\", \"status\": \"Pending\", \"customer_id\": 20}}', NULL, '2026-05-27 00:11:47'),
+(862, 3, 'Receptionist', NULL, 'UPDATE', 'appointments', 257, '{\"new\": {\"date\": \"2026-05-27 11:11:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}, \"old\": {\"date\": \"2026-05-27 11:11:00.000000\", \"status\": \"Pending\", \"technician_id\": null}}', NULL, '2026-05-27 00:12:17'),
+(863, 4, 'Technician', NULL, 'UPDATE', 'appointments', 257, '{\"new\": {\"date\": \"2026-05-27 11:11:00.000000\", \"status\": \"In Progress\", \"technician_id\": 4}, \"old\": {\"date\": \"2026-05-27 11:11:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}}', NULL, '2026-05-27 00:12:27'),
+(864, 4, 'Technician', NULL, 'UPDATE', 'appointments', 257, '{\"new\": {\"date\": \"2026-05-27 11:11:00.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2026-05-27 11:11:00.000000\", \"status\": \"In Progress\", \"technician_id\": 4}}', NULL, '2026-05-27 00:12:54'),
+(865, 23, 'Customer', NULL, 'CREATE', 'appointments', 258, '{\"new\": {\"date\": \"2026-05-27 13:05:00.000000\", \"status\": \"Pending\", \"customer_id\": 23}}', NULL, '2026-05-27 03:05:20'),
+(866, 1, 'Admin', NULL, 'UPDATE', 'appointments', 258, '{\"new\": {\"date\": \"2026-05-27 13:05:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}, \"old\": {\"date\": \"2026-05-27 13:05:00.000000\", \"status\": \"Pending\", \"technician_id\": null}}', NULL, '2026-05-27 03:05:33'),
+(867, 1, 'Admin', NULL, 'UPDATE', 'appointments', 258, '{\"status\":\"Confirmed\",\"note\":\"Appointment #258 was confirmed\"}', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', '2026-05-27 03:05:33'),
+(868, 1, 'Admin', NULL, 'UPDATE', 'appointments', 258, '{\"new\": {\"date\": \"2026-05-27 13:05:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}, \"old\": {\"date\": \"2026-05-27 13:05:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:05:36'),
+(869, 1, 'Admin', NULL, 'UPDATE', 'appointments', 258, '{\"status\":\"Confirmed\",\"note\":\"Appointment #258 was confirmed\"}', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', '2026-05-27 03:05:36'),
+(870, 4, 'Technician', NULL, 'UPDATE', 'appointments', 258, '{\"new\": {\"date\": \"2026-05-27 13:05:00.000000\", \"status\": \"In Progress\", \"technician_id\": 4}, \"old\": {\"date\": \"2026-05-27 13:05:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:06:13'),
+(871, 4, 'Technician', NULL, 'UPDATE', 'appointments', 258, '{\"new\": {\"date\": \"2026-05-27 13:05:00.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2026-05-27 13:05:00.000000\", \"status\": \"In Progress\", \"technician_id\": 4}}', NULL, '2026-05-27 03:06:34'),
+(872, 23, 'Customer', NULL, 'UPDATE', 'users', 23, '{\"new\": {\"role\": \"Customer\", \"email\": \"sandara@gmail.com\", \"last_name\": \"Maullon\", \"first_name\": \"Sandara\"}, \"old\": {\"role\": \"Customer\", \"email\": \"marygonzalez10@example.com\", \"last_name\": \"Gonzalez\", \"first_name\": \"Mary\"}}', NULL, '2026-05-27 03:12:13'),
+(873, NULL, NULL, NULL, 'UPDATE', 'appointments', 221, '{\"new\": {\"date\": \"2026-11-13 12:32:57.000000\", \"status\": \"Rejected\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-13 12:32:57.000000\", \"status\": \"Rejected\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:13'),
+(874, NULL, NULL, NULL, 'UPDATE', 'appointments', 7, '{\"new\": {\"date\": \"2026-12-10 03:35:40.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-12-10 03:35:40.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:13'),
+(875, NULL, NULL, NULL, 'UPDATE', 'appointments', 57, '{\"new\": {\"date\": \"2026-10-10 16:36:12.000000\", \"status\": \"Completed\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-10-10 16:36:12.000000\", \"status\": \"Completed\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:13'),
+(876, NULL, NULL, NULL, 'UPDATE', 'appointments', 71, '{\"new\": {\"date\": \"2026-08-31 22:56:16.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-08-31 22:56:16.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:13'),
+(877, NULL, NULL, NULL, 'UPDATE', 'appointments', 167, '{\"new\": {\"date\": \"2026-12-10 09:08:00.000000\", \"status\": \"Pending\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-10 09:08:00.000000\", \"status\": \"Pending\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:13'),
+(878, NULL, NULL, NULL, 'UPDATE', 'appointments', 127, '{\"new\": {\"date\": \"2026-08-27 06:25:56.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-08-27 06:25:56.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:13'),
+(879, NULL, NULL, NULL, 'UPDATE', 'appointments', 59, '{\"new\": {\"date\": \"2026-07-19 13:20:51.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-07-19 13:20:51.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:13'),
+(880, NULL, NULL, NULL, 'UPDATE', 'appointments', 153, '{\"new\": {\"date\": \"2026-11-28 02:39:00.000000\", \"status\": \"Cancelled\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-11-28 02:39:00.000000\", \"status\": \"Cancelled\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:13'),
+(881, NULL, NULL, NULL, 'UPDATE', 'appointments', 137, '{\"new\": {\"date\": \"2026-06-09 21:15:50.000000\", \"status\": \"Completed\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-06-09 21:15:50.000000\", \"status\": \"Completed\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:13'),
+(882, NULL, NULL, NULL, 'UPDATE', 'appointments', 74, '{\"new\": {\"date\": \"2026-08-02 06:33:36.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-08-02 06:33:36.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:13'),
+(883, NULL, NULL, NULL, 'UPDATE', 'appointments', 125, '{\"new\": {\"date\": \"2026-10-04 07:24:31.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-10-04 07:24:31.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:13'),
+(884, NULL, NULL, NULL, 'UPDATE', 'appointments', 53, '{\"new\": {\"date\": \"2026-05-24 14:24:02.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-05-24 14:24:02.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:13'),
+(885, NULL, NULL, NULL, 'UPDATE', 'appointments', 164, '{\"new\": {\"date\": \"2026-11-28 23:59:00.000000\", \"status\": \"Cancelled\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-11-28 23:59:00.000000\", \"status\": \"Cancelled\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:13'),
+(886, NULL, NULL, NULL, 'UPDATE', 'appointments', 132, '{\"new\": {\"date\": \"2026-07-27 04:55:06.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-07-27 04:55:06.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:13'),
+(887, NULL, NULL, NULL, 'UPDATE', 'appointments', 76, '{\"new\": {\"date\": \"2026-12-18 19:35:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-12-18 19:35:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:13'),
+(888, NULL, NULL, NULL, 'UPDATE', 'appointments', 158, '{\"new\": {\"date\": \"2026-11-28 21:17:00.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-11-28 21:17:00.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:13'),
+(889, NULL, NULL, NULL, 'UPDATE', 'appointments', 161, '{\"new\": {\"date\": \"2026-11-28 22:12:00.000000\", \"status\": \"Cancelled\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-11-28 22:12:00.000000\", \"status\": \"Cancelled\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:13'),
+(890, NULL, NULL, NULL, 'UPDATE', 'appointments', 138, '{\"new\": {\"date\": \"2026-05-31 16:54:18.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-05-31 16:54:18.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:13'),
+(891, NULL, NULL, NULL, 'UPDATE', 'appointments', 1, '{\"new\": {\"date\": \"2026-06-14 22:03:00.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-06-14 22:03:00.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:13'),
+(892, NULL, NULL, NULL, 'UPDATE', 'appointments', 147, '{\"new\": {\"date\": \"2026-08-19 15:58:09.000000\", \"status\": \"Completed\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-08-19 15:58:09.000000\", \"status\": \"Completed\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:13'),
+(893, NULL, NULL, NULL, 'UPDATE', 'appointments', 130, '{\"new\": {\"date\": \"2026-08-29 18:04:43.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-08-29 18:04:43.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:13'),
+(894, NULL, NULL, NULL, 'UPDATE', 'appointments', 168, '{\"new\": {\"date\": \"2026-11-30 10:21:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 5}, \"old\": {\"date\": \"2025-11-30 10:21:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 5}}', NULL, '2026-05-27 03:34:13'),
+(895, NULL, NULL, NULL, 'UPDATE', 'appointments', 133, '{\"new\": {\"date\": \"2026-06-23 14:18:19.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-06-23 14:18:19.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:13'),
+(896, NULL, NULL, NULL, 'UPDATE', 'appointments', 149, '{\"new\": {\"date\": \"2026-10-14 22:56:30.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-10-14 22:56:30.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:13');
+INSERT INTO `audit_logs` (`log_id`, `user_id`, `actor_role`, `actor_username`, `action`, `table_name`, `record_id`, `changes`, `user_agent`, `created_at`) VALUES
+(897, NULL, NULL, NULL, 'UPDATE', 'appointments', 87, '{\"new\": {\"date\": \"2026-07-16 02:58:25.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-07-16 02:58:25.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:13'),
+(898, NULL, NULL, NULL, 'UPDATE', 'appointments', 154, '{\"new\": {\"date\": \"2026-11-26 00:45:00.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-11-26 00:45:00.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:13'),
+(899, NULL, NULL, NULL, 'UPDATE', 'appointments', 124, '{\"new\": {\"date\": \"2026-08-03 02:04:41.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-08-03 02:04:41.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:13'),
+(900, NULL, NULL, NULL, 'UPDATE', 'appointments', 52, '{\"new\": {\"date\": \"2026-09-15 23:29:43.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-09-15 23:29:43.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:13'),
+(901, NULL, NULL, NULL, 'UPDATE', 'appointments', 90, '{\"new\": {\"date\": \"2026-07-14 05:47:39.000000\", \"status\": \"Completed\", \"technician_id\": 11}, \"old\": {\"date\": \"2025-07-14 05:47:39.000000\", \"status\": \"Completed\", \"technician_id\": 11}}', NULL, '2026-05-27 03:34:13'),
+(902, NULL, NULL, NULL, 'UPDATE', 'appointments', 75, '{\"new\": {\"date\": \"2026-09-01 13:20:42.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-09-01 13:20:42.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:13'),
+(903, NULL, NULL, NULL, 'UPDATE', 'appointments', 129, '{\"new\": {\"date\": \"2026-07-15 14:52:39.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-07-15 14:52:39.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:13'),
+(904, NULL, NULL, NULL, 'UPDATE', 'appointments', 126, '{\"new\": {\"date\": \"2026-09-23 01:58:20.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-09-23 01:58:20.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:13'),
+(905, NULL, NULL, NULL, 'UPDATE', 'appointments', 123, '{\"new\": {\"date\": \"2026-06-26 02:34:03.000000\", \"status\": \"Completed\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-06-26 02:34:03.000000\", \"status\": \"Completed\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:13'),
+(906, NULL, NULL, NULL, 'UPDATE', 'appointments', 122, '{\"new\": {\"date\": \"2026-09-04 09:09:18.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-09-04 09:09:18.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:13'),
+(907, NULL, NULL, NULL, 'UPDATE', 'appointments', 121, '{\"new\": {\"date\": \"2026-12-21 14:05:05.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-21 14:05:05.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:13'),
+(908, NULL, NULL, NULL, 'UPDATE', 'appointments', 105, '{\"new\": {\"date\": \"2026-11-22 18:32:42.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-22 18:32:42.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:13'),
+(909, NULL, NULL, NULL, 'UPDATE', 'appointments', 140, '{\"new\": {\"date\": \"2026-07-26 04:23:33.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-07-26 04:23:33.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:13'),
+(910, NULL, NULL, NULL, 'UPDATE', 'appointments', 148, '{\"new\": {\"date\": \"2026-06-20 08:33:42.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-06-20 08:33:42.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(911, NULL, NULL, NULL, 'UPDATE', 'appointments', 143, '{\"new\": {\"date\": \"2026-11-28 10:35:46.000000\", \"status\": \"Pending\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-28 10:35:46.000000\", \"status\": \"Pending\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(912, NULL, NULL, NULL, 'UPDATE', 'appointments', 46, '{\"new\": {\"date\": \"2026-12-12 22:58:54.000000\", \"status\": \"Confirmed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-12-12 22:58:54.000000\", \"status\": \"Confirmed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:14'),
+(913, NULL, NULL, NULL, 'UPDATE', 'appointments', 120, '{\"new\": {\"date\": \"2026-11-13 04:34:28.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-11-13 04:34:28.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(914, NULL, NULL, NULL, 'UPDATE', 'appointments', 152, '{\"new\": {\"date\": \"2026-11-26 21:41:00.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-11-26 21:41:00.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(915, NULL, NULL, NULL, 'UPDATE', 'appointments', 155, '{\"new\": {\"date\": \"2026-11-27 21:02:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-11-27 21:02:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(916, NULL, NULL, NULL, 'UPDATE', 'appointments', 23, '{\"new\": {\"date\": \"2026-12-10 21:46:54.000000\", \"status\": \"Confirmed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-12-10 21:46:54.000000\", \"status\": \"Confirmed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:14'),
+(917, NULL, NULL, NULL, 'UPDATE', 'appointments', 135, '{\"new\": {\"date\": \"2026-12-07 08:42:36.000000\", \"status\": \"Pending\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-07 08:42:36.000000\", \"status\": \"Pending\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(918, NULL, NULL, NULL, 'UPDATE', 'appointments', 119, '{\"new\": {\"date\": \"2026-09-28 04:48:25.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-09-28 04:48:25.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(919, NULL, NULL, NULL, 'UPDATE', 'appointments', 157, '{\"new\": {\"date\": \"2026-11-28 21:13:00.000000\", \"status\": \"Confirmed\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-28 21:13:00.000000\", \"status\": \"Confirmed\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(920, NULL, NULL, NULL, 'UPDATE', 'appointments', 17, '{\"new\": {\"date\": \"2026-06-26 23:08:59.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-06-26 23:08:59.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:14'),
+(921, NULL, NULL, NULL, 'UPDATE', 'appointments', 11, '{\"new\": {\"date\": \"2026-10-21 02:05:23.000000\", \"status\": \"Completed\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-10-21 02:05:23.000000\", \"status\": \"Completed\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:14'),
+(922, NULL, NULL, NULL, 'UPDATE', 'appointments', 49, '{\"new\": {\"date\": \"2026-12-16 23:36:22.000000\", \"status\": \"Confirmed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-12-16 23:36:22.000000\", \"status\": \"Confirmed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:14'),
+(923, NULL, NULL, NULL, 'UPDATE', 'appointments', 118, '{\"new\": {\"date\": \"2026-06-23 23:00:02.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-06-23 23:00:02.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:14'),
+(924, NULL, NULL, NULL, 'UPDATE', 'appointments', 224, '{\"new\": {\"date\": \"2026-11-09 12:32:57.000000\", \"status\": \"Rejected\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-09 12:32:57.000000\", \"status\": \"Rejected\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(925, NULL, NULL, NULL, 'UPDATE', 'appointments', 5, '{\"new\": {\"date\": \"2026-12-06 13:15:47.000000\", \"status\": \"Cancelled\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-12-06 13:15:47.000000\", \"status\": \"Cancelled\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(926, NULL, NULL, NULL, 'UPDATE', 'appointments', 173, '{\"new\": {\"date\": \"2026-11-26 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-11-26 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:14'),
+(927, NULL, NULL, NULL, 'UPDATE', 'appointments', 117, '{\"new\": {\"date\": \"2026-11-09 18:26:50.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-11-09 18:26:50.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:14'),
+(928, NULL, NULL, NULL, 'UPDATE', 'appointments', 61, '{\"new\": {\"date\": \"2026-12-21 08:44:20.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-21 08:44:20.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(929, NULL, NULL, NULL, 'UPDATE', 'appointments', 203, '{\"new\": {\"date\": \"2026-11-17 12:32:57.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-17 12:32:57.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(930, NULL, NULL, NULL, 'UPDATE', 'appointments', 28, '{\"new\": {\"date\": \"2026-09-18 01:22:51.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-09-18 01:22:51.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:14'),
+(931, NULL, NULL, NULL, 'UPDATE', 'appointments', 178, '{\"new\": {\"date\": \"2026-11-17 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-11-17 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:14'),
+(932, NULL, NULL, NULL, 'UPDATE', 'appointments', 42, '{\"new\": {\"date\": \"2026-12-19 21:52:34.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-19 21:52:34.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(933, NULL, NULL, NULL, 'UPDATE', 'appointments', 207, '{\"new\": {\"date\": \"2026-11-09 12:32:57.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-09 12:32:57.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(934, NULL, NULL, NULL, 'UPDATE', 'appointments', 116, '{\"new\": {\"date\": \"2026-08-26 01:26:48.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-08-26 01:26:48.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:14'),
+(935, NULL, NULL, NULL, 'UPDATE', 'appointments', 172, '{\"new\": {\"date\": \"2026-11-16 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-11-16 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:14'),
+(936, NULL, NULL, NULL, 'UPDATE', 'appointments', 6, '{\"new\": {\"date\": \"2026-11-25 10:05:29.000000\", \"status\": \"Rejected\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-25 10:05:29.000000\", \"status\": \"Rejected\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(937, NULL, NULL, NULL, 'UPDATE', 'appointments', 97, '{\"new\": {\"date\": \"2026-11-30 02:12:08.000000\", \"status\": \"Confirmed\", \"technician_id\": 11}, \"old\": {\"date\": \"2025-11-30 02:12:08.000000\", \"status\": \"Confirmed\", \"technician_id\": 11}}', NULL, '2026-05-27 03:34:14'),
+(938, NULL, NULL, NULL, 'UPDATE', 'appointments', 44, '{\"new\": {\"date\": \"2026-05-25 05:10:30.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-05-25 05:10:30.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(939, NULL, NULL, NULL, 'UPDATE', 'appointments', 86, '{\"new\": {\"date\": \"2026-11-15 05:08:39.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-11-15 05:08:39.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:14'),
+(940, NULL, NULL, NULL, 'UPDATE', 'appointments', 37, '{\"new\": {\"date\": \"2026-11-30 13:19:52.000000\", \"status\": \"Cancelled\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-11-30 13:19:52.000000\", \"status\": \"Cancelled\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:14'),
+(941, NULL, NULL, NULL, 'UPDATE', 'appointments', 39, '{\"new\": {\"date\": \"2026-12-01 02:08:09.000000\", \"status\": \"Confirmed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-12-01 02:08:09.000000\", \"status\": \"Confirmed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:14'),
+(942, NULL, NULL, NULL, 'UPDATE', 'appointments', 128, '{\"new\": {\"date\": \"2026-11-01 04:00:07.000000\", \"status\": \"Completed\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-11-01 04:00:07.000000\", \"status\": \"Completed\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:14'),
+(943, NULL, NULL, NULL, 'UPDATE', 'appointments', 108, '{\"new\": {\"date\": \"2026-09-03 03:17:03.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-09-03 03:17:03.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(944, NULL, NULL, NULL, 'UPDATE', 'appointments', 146, '{\"new\": {\"date\": \"2026-11-04 12:39:08.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-11-04 12:39:08.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:14'),
+(945, NULL, NULL, NULL, 'UPDATE', 'appointments', 43, '{\"new\": {\"date\": \"2026-08-30 08:29:20.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-08-30 08:29:20.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:14'),
+(946, NULL, NULL, NULL, 'UPDATE', 'appointments', 73, '{\"new\": {\"date\": \"2026-06-27 19:24:34.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-06-27 19:24:34.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(947, NULL, NULL, NULL, 'UPDATE', 'appointments', 29, '{\"new\": {\"date\": \"2026-09-29 08:14:52.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-09-29 08:14:52.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(948, NULL, NULL, NULL, 'UPDATE', 'appointments', 12, '{\"new\": {\"date\": \"2026-08-05 19:45:08.000000\", \"status\": \"Completed\", \"technician_id\": 11}, \"old\": {\"date\": \"2025-08-05 19:45:08.000000\", \"status\": \"Completed\", \"technician_id\": 11}}', NULL, '2026-05-27 03:34:14'),
+(949, NULL, NULL, NULL, 'UPDATE', 'appointments', 187, '{\"new\": {\"date\": \"2026-11-27 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-11-27 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:14'),
+(950, NULL, NULL, NULL, 'UPDATE', 'appointments', 163, '{\"new\": {\"date\": \"2026-11-28 23:24:00.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-11-28 23:24:00.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(951, NULL, NULL, NULL, 'UPDATE', 'appointments', 115, '{\"new\": {\"date\": \"2026-09-06 12:58:07.000000\", \"status\": \"Completed\", \"technician_id\": 11}, \"old\": {\"date\": \"2025-09-06 12:58:07.000000\", \"status\": \"Completed\", \"technician_id\": 11}}', NULL, '2026-05-27 03:34:14'),
+(952, NULL, NULL, NULL, 'UPDATE', 'appointments', 144, '{\"new\": {\"date\": \"2026-08-31 15:57:03.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-08-31 15:57:03.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:14'),
+(953, NULL, NULL, NULL, 'UPDATE', 'appointments', 20, '{\"new\": {\"date\": \"2026-12-17 07:24:04.000000\", \"status\": \"Confirmed\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-12-17 07:24:04.000000\", \"status\": \"Confirmed\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:14'),
+(954, NULL, NULL, NULL, 'UPDATE', 'appointments', 35, '{\"new\": {\"date\": \"2026-07-26 08:05:31.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-07-26 08:05:31.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:14'),
+(955, NULL, NULL, NULL, 'UPDATE', 'appointments', 205, '{\"new\": {\"date\": \"2026-11-06 12:32:57.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-06 12:32:57.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(956, NULL, NULL, NULL, 'UPDATE', 'appointments', 182, '{\"new\": {\"date\": \"2026-11-30 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-11-30 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:14'),
+(957, NULL, NULL, NULL, 'UPDATE', 'appointments', 223, '{\"new\": {\"date\": \"2026-11-17 12:32:57.000000\", \"status\": \"Rejected\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-17 12:32:57.000000\", \"status\": \"Rejected\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(958, NULL, NULL, NULL, 'UPDATE', 'appointments', 175, '{\"new\": {\"date\": \"2026-11-30 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-11-30 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:14'),
+(959, NULL, NULL, NULL, 'UPDATE', 'appointments', 22, '{\"new\": {\"date\": \"2026-06-05 21:59:33.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-06-05 21:59:33.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(960, NULL, NULL, NULL, 'UPDATE', 'appointments', 47, '{\"new\": {\"date\": \"2026-10-19 02:59:56.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-10-19 02:59:56.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:14'),
+(961, NULL, NULL, NULL, 'UPDATE', 'appointments', 81, '{\"new\": {\"date\": \"2026-11-11 11:46:59.000000\", \"status\": \"Completed\", \"technician_id\": 11}, \"old\": {\"date\": \"2025-11-11 11:46:59.000000\", \"status\": \"Completed\", \"technician_id\": 11}}', NULL, '2026-05-27 03:34:14'),
+(962, NULL, NULL, NULL, 'UPDATE', 'appointments', 51, '{\"new\": {\"date\": \"2026-12-09 12:34:19.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-12-09 12:34:19.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(963, NULL, NULL, NULL, 'UPDATE', 'appointments', 9, '{\"new\": {\"date\": \"2026-05-30 22:15:39.000000\", \"status\": \"Completed\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-05-30 22:15:39.000000\", \"status\": \"Completed\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:14'),
+(964, NULL, NULL, NULL, 'UPDATE', 'appointments', 179, '{\"new\": {\"date\": \"2026-11-25 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-11-25 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:14'),
+(965, NULL, NULL, NULL, 'UPDATE', 'appointments', 32, '{\"new\": {\"date\": \"2026-11-13 16:41:11.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-13 16:41:11.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(966, NULL, NULL, NULL, 'UPDATE', 'appointments', 233, '{\"new\": {\"date\": \"2026-12-13 12:32:57.000000\", \"status\": \"Confirmed\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-13 12:32:57.000000\", \"status\": \"Confirmed\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(967, NULL, NULL, NULL, 'UPDATE', 'appointments', 48, '{\"new\": {\"date\": \"2026-12-06 08:58:44.000000\", \"status\": \"Pending\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-06 08:58:44.000000\", \"status\": \"Pending\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(968, NULL, NULL, NULL, 'UPDATE', 'appointments', 27, '{\"new\": {\"date\": \"2026-10-14 08:52:40.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-10-14 08:52:40.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:14'),
+(969, NULL, NULL, NULL, 'UPDATE', 'appointments', 202, '{\"new\": {\"date\": \"2026-11-09 12:32:57.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-09 12:32:57.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(970, NULL, NULL, NULL, 'UPDATE', 'appointments', 240, '{\"new\": {\"date\": \"2026-12-06 12:32:57.000000\", \"status\": \"Confirmed\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-06 12:32:57.000000\", \"status\": \"Confirmed\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(971, NULL, NULL, NULL, 'UPDATE', 'appointments', 2, '{\"new\": {\"date\": \"2026-06-23 09:30:31.000000\", \"status\": \"Completed\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-06-23 09:30:31.000000\", \"status\": \"Completed\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:14'),
+(972, NULL, NULL, NULL, 'UPDATE', 'appointments', 206, '{\"new\": {\"date\": \"2026-11-20 12:32:57.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-20 12:32:57.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(973, NULL, NULL, NULL, 'UPDATE', 'appointments', 156, '{\"new\": {\"date\": \"2026-11-27 22:06:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-11-27 22:06:00.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(974, NULL, NULL, NULL, 'UPDATE', 'appointments', 30, '{\"new\": {\"date\": \"2026-06-29 00:57:25.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-06-29 00:57:25.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(975, NULL, NULL, NULL, 'UPDATE', 'appointments', 3, '{\"new\": {\"date\": \"2026-10-11 18:01:45.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-10-11 18:01:45.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(976, NULL, NULL, NULL, 'UPDATE', 'appointments', 98, '{\"new\": {\"date\": \"2026-09-20 11:39:56.000000\", \"status\": \"Completed\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-09-20 11:39:56.000000\", \"status\": \"Completed\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:14'),
+(977, NULL, NULL, NULL, 'UPDATE', 'appointments', 8, '{\"new\": {\"date\": \"2026-06-24 22:21:38.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-06-24 22:21:38.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(978, NULL, NULL, NULL, 'UPDATE', 'appointments', 114, '{\"new\": {\"date\": \"2026-08-16 04:27:59.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-08-16 04:27:59.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:14'),
+(979, NULL, NULL, NULL, 'UPDATE', 'appointments', 238, '{\"new\": {\"date\": \"2026-12-05 12:32:57.000000\", \"status\": \"Confirmed\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-05 12:32:57.000000\", \"status\": \"Confirmed\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(980, NULL, NULL, NULL, 'UPDATE', 'appointments', 10, '{\"new\": {\"date\": \"2026-10-06 05:03:44.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-10-06 05:03:44.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:14'),
+(981, NULL, NULL, NULL, 'UPDATE', 'appointments', 209, '{\"new\": {\"date\": \"2026-11-28 12:32:57.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-28 12:32:57.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(982, NULL, NULL, NULL, 'UPDATE', 'appointments', 150, '{\"new\": {\"date\": \"2026-10-17 08:42:38.000000\", \"status\": \"Completed\", \"technician_id\": 11}, \"old\": {\"date\": \"2025-10-17 08:42:38.000000\", \"status\": \"Completed\", \"technician_id\": 11}}', NULL, '2026-05-27 03:34:14'),
+(983, NULL, NULL, NULL, 'UPDATE', 'appointments', 50, '{\"new\": {\"date\": \"2026-12-24 06:09:42.000000\", \"status\": \"Rejected\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-24 06:09:42.000000\", \"status\": \"Rejected\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(984, NULL, NULL, NULL, 'UPDATE', 'appointments', 142, '{\"new\": {\"date\": \"2026-08-24 13:34:32.000000\", \"status\": \"Completed\", \"technician_id\": 11}, \"old\": {\"date\": \"2025-08-24 13:34:32.000000\", \"status\": \"Completed\", \"technician_id\": 11}}', NULL, '2026-05-27 03:34:14'),
+(985, NULL, NULL, NULL, 'UPDATE', 'appointments', 234, '{\"new\": {\"date\": \"2026-12-13 12:32:57.000000\", \"status\": \"Pending\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-13 12:32:57.000000\", \"status\": \"Pending\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(986, NULL, NULL, NULL, 'UPDATE', 'appointments', 113, '{\"new\": {\"date\": \"2026-06-01 11:11:19.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-06-01 11:11:19.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:14'),
+(987, NULL, NULL, NULL, 'UPDATE', 'appointments', 92, '{\"new\": {\"date\": \"2026-09-23 10:37:52.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-09-23 10:37:52.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(988, NULL, NULL, NULL, 'UPDATE', 'appointments', 72, '{\"new\": {\"date\": \"2026-11-01 12:58:42.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-11-01 12:58:42.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:14'),
+(989, NULL, NULL, NULL, 'UPDATE', 'appointments', 112, '{\"new\": {\"date\": \"2026-10-06 12:25:52.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-10-06 12:25:52.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:14'),
+(990, NULL, NULL, NULL, 'UPDATE', 'appointments', 174, '{\"new\": {\"date\": \"2026-11-15 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-11-15 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:14'),
+(991, NULL, NULL, NULL, 'UPDATE', 'appointments', 102, '{\"new\": {\"date\": \"2026-11-02 10:26:41.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-11-02 10:26:41.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:14'),
+(992, NULL, NULL, NULL, 'UPDATE', 'appointments', 103, '{\"new\": {\"date\": \"2026-10-02 14:51:18.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-10-02 14:51:18.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:14'),
+(993, NULL, NULL, NULL, 'UPDATE', 'appointments', 134, '{\"new\": {\"date\": \"2026-07-12 03:37:02.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-07-12 03:37:02.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:14'),
+(994, NULL, NULL, NULL, 'UPDATE', 'appointments', 68, '{\"new\": {\"date\": \"2026-10-10 21:32:10.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-10-10 21:32:10.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:14'),
+(995, NULL, NULL, NULL, 'UPDATE', 'appointments', 210, '{\"new\": {\"date\": \"2026-11-16 12:32:57.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-16 12:32:57.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(996, NULL, NULL, NULL, 'UPDATE', 'appointments', 145, '{\"new\": {\"date\": \"2026-08-04 03:04:56.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-08-04 03:04:56.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(997, NULL, NULL, NULL, 'UPDATE', 'appointments', 55, '{\"new\": {\"date\": \"2026-10-03 19:13:00.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-10-03 19:13:00.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:14'),
+(998, NULL, NULL, NULL, 'UPDATE', 'appointments', 141, '{\"new\": {\"date\": \"2026-09-04 01:54:41.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-09-04 01:54:41.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:14'),
+(999, NULL, NULL, NULL, 'UPDATE', 'appointments', 24, '{\"new\": {\"date\": \"2026-11-26 01:57:00.000000\", \"status\": \"Confirmed\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-26 01:57:00.000000\", \"status\": \"Confirmed\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(1000, NULL, NULL, NULL, 'UPDATE', 'appointments', 136, '{\"new\": {\"date\": \"2026-12-12 10:22:41.000000\", \"status\": \"Confirmed\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-12-12 10:22:41.000000\", \"status\": \"Confirmed\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:14'),
+(1001, NULL, NULL, NULL, 'UPDATE', 'appointments', 95, '{\"new\": {\"date\": \"2026-08-11 23:57:33.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-08-11 23:57:33.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:14'),
+(1002, NULL, NULL, NULL, 'UPDATE', 'appointments', 101, '{\"new\": {\"date\": \"2026-09-05 14:05:12.000000\", \"status\": \"Completed\", \"technician_id\": 11}, \"old\": {\"date\": \"2025-09-05 14:05:12.000000\", \"status\": \"Completed\", \"technician_id\": 11}}', NULL, '2026-05-27 03:34:14'),
+(1003, NULL, NULL, NULL, 'UPDATE', 'appointments', 139, '{\"new\": {\"date\": \"2026-08-08 00:38:33.000000\", \"status\": \"Completed\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-08-08 00:38:33.000000\", \"status\": \"Completed\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:14'),
+(1004, NULL, NULL, NULL, 'UPDATE', 'appointments', 166, '{\"new\": {\"date\": \"2026-12-01 12:55:00.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-12-01 12:55:00.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:14'),
+(1005, NULL, NULL, NULL, 'UPDATE', 'appointments', 251, '{\"new\": {\"date\": \"2026-12-04 11:00:00.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-04 11:00:00.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:14'),
+(1006, NULL, NULL, NULL, 'UPDATE', 'appointments', 110, '{\"new\": {\"date\": \"2026-07-01 16:54:30.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-07-01 16:54:30.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:15'),
+(1007, NULL, NULL, NULL, 'UPDATE', 'appointments', 34, '{\"new\": {\"date\": \"2026-12-19 23:35:13.000000\", \"status\": \"Cancelled\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-12-19 23:35:13.000000\", \"status\": \"Cancelled\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:15'),
+(1008, NULL, NULL, NULL, 'UPDATE', 'appointments', 77, '{\"new\": {\"date\": \"2026-10-02 09:25:25.000000\", \"status\": \"Completed\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-10-02 09:25:25.000000\", \"status\": \"Completed\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:15'),
+(1009, NULL, NULL, NULL, 'UPDATE', 'appointments', 21, '{\"new\": {\"date\": \"2026-11-28 05:26:44.000000\", \"status\": \"Rejected\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-28 05:26:44.000000\", \"status\": \"Rejected\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:15'),
+(1010, NULL, NULL, NULL, 'UPDATE', 'appointments', 165, '{\"new\": {\"date\": \"2026-11-29 02:23:00.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-11-29 02:23:00.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:15'),
+(1011, NULL, NULL, NULL, 'UPDATE', 'appointments', 16, '{\"new\": {\"date\": \"2026-12-23 08:45:10.000000\", \"status\": \"Cancelled\", \"technician_id\": 11}, \"old\": {\"date\": \"2025-12-23 08:45:10.000000\", \"status\": \"Cancelled\", \"technician_id\": 11}}', NULL, '2026-05-27 03:34:15'),
+(1012, NULL, NULL, NULL, 'UPDATE', 'appointments', 171, '{\"new\": {\"date\": \"2026-11-17 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-11-17 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:15'),
+(1013, NULL, NULL, NULL, 'UPDATE', 'appointments', 247, '{\"new\": {\"date\": \"2026-12-04 21:28:00.000000\", \"status\": \"Cancelled\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-12-04 21:28:00.000000\", \"status\": \"Cancelled\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:15'),
+(1014, NULL, NULL, NULL, 'UPDATE', 'appointments', 91, '{\"new\": {\"date\": \"2026-12-22 09:24:29.000000\", \"status\": \"Cancelled\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-12-22 09:24:29.000000\", \"status\": \"Cancelled\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:15'),
+(1015, NULL, NULL, NULL, 'UPDATE', 'appointments', 62, '{\"new\": {\"date\": \"2026-05-29 03:19:54.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-05-29 03:19:54.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:15'),
+(1016, NULL, NULL, NULL, 'UPDATE', 'appointments', 89, '{\"new\": {\"date\": \"2026-06-14 09:16:56.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-06-14 09:16:56.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:15'),
+(1017, NULL, NULL, NULL, 'UPDATE', 'appointments', 70, '{\"new\": {\"date\": \"2026-09-05 05:26:27.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-09-05 05:26:27.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:15'),
+(1018, NULL, NULL, NULL, 'UPDATE', 'appointments', 180, '{\"new\": {\"date\": \"2026-11-09 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-11-09 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:15'),
+(1019, NULL, NULL, NULL, 'UPDATE', 'appointments', 45, '{\"new\": {\"date\": \"2026-07-24 09:30:24.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-07-24 09:30:24.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:15'),
+(1020, NULL, NULL, NULL, 'UPDATE', 'appointments', 111, '{\"new\": {\"date\": \"2026-12-06 10:35:25.000000\", \"status\": \"Confirmed\", \"technician_id\": 8}, \"old\": {\"date\": \"2025-12-06 10:35:25.000000\", \"status\": \"Confirmed\", \"technician_id\": 8}}', NULL, '2026-05-27 03:34:15'),
+(1021, NULL, NULL, NULL, 'UPDATE', 'appointments', 36, '{\"new\": {\"date\": \"2026-06-02 08:51:43.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-06-02 08:51:43.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:15'),
+(1022, NULL, NULL, NULL, 'UPDATE', 'appointments', 25, '{\"new\": {\"date\": \"2026-12-19 19:36:10.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-19 19:36:10.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:15'),
+(1023, NULL, NULL, NULL, 'UPDATE', 'appointments', 66, '{\"new\": {\"date\": \"2026-09-15 16:12:16.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-09-15 16:12:16.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:15'),
+(1024, NULL, NULL, NULL, 'UPDATE', 'appointments', 18, '{\"new\": {\"date\": \"2026-12-08 20:29:24.000000\", \"status\": \"Confirmed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-12-08 20:29:24.000000\", \"status\": \"Confirmed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:15'),
+(1025, NULL, NULL, NULL, 'UPDATE', 'appointments', 14, '{\"new\": {\"date\": \"2026-06-29 00:37:45.000000\", \"status\": \"Completed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-06-29 00:37:45.000000\", \"status\": \"Completed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:15'),
+(1026, NULL, NULL, NULL, 'UPDATE', 'appointments', 170, '{\"new\": {\"date\": \"2026-12-07 07:52:00.000000\", \"status\": \"Pending\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-07 07:52:00.000000\", \"status\": \"Pending\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:15'),
+(1027, NULL, NULL, NULL, 'UPDATE', 'appointments', 13, '{\"new\": {\"date\": \"2026-09-22 19:02:32.000000\", \"status\": \"Completed\", \"technician_id\": 10}, \"old\": {\"date\": \"2025-09-22 19:02:32.000000\", \"status\": \"Completed\", \"technician_id\": 10}}', NULL, '2026-05-27 03:34:15'),
+(1028, NULL, NULL, NULL, 'UPDATE', 'appointments', 237, '{\"new\": {\"date\": \"2026-12-10 12:32:57.000000\", \"status\": \"Pending\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-10 12:32:57.000000\", \"status\": \"Pending\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:15'),
+(1029, NULL, NULL, NULL, 'UPDATE', 'appointments', 177, '{\"new\": {\"date\": \"2026-11-15 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 5}, \"old\": {\"date\": \"2025-11-15 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 5}}', NULL, '2026-05-27 03:34:15'),
+(1030, NULL, NULL, NULL, 'UPDATE', 'appointments', 107, '{\"new\": {\"date\": \"2026-06-28 06:06:49.000000\", \"status\": \"Completed\", \"technician_id\": 11}, \"old\": {\"date\": \"2025-06-28 06:06:49.000000\", \"status\": \"Completed\", \"technician_id\": 11}}', NULL, '2026-05-27 03:34:15'),
+(1031, NULL, NULL, NULL, 'UPDATE', 'appointments', 67, '{\"new\": {\"date\": \"2026-08-25 22:05:19.000000\", \"status\": \"Completed\", \"technician_id\": 12}, \"old\": {\"date\": \"2025-08-25 22:05:19.000000\", \"status\": \"Completed\", \"technician_id\": 12}}', NULL, '2026-05-27 03:34:15'),
+(1032, NULL, NULL, NULL, 'UPDATE', 'appointments', 188, '{\"new\": {\"date\": \"2026-11-21 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-11-21 12:32:57.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:15'),
+(1033, NULL, NULL, NULL, 'UPDATE', 'appointments', 4, '{\"new\": {\"date\": \"2026-07-03 04:34:04.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-07-03 04:34:04.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:15'),
+(1034, NULL, NULL, NULL, 'UPDATE', 'appointments', 85, '{\"new\": {\"date\": \"2026-09-19 12:46:23.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-09-19 12:46:23.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:15'),
+(1035, NULL, NULL, NULL, 'UPDATE', 'appointments', 232, '{\"new\": {\"date\": \"2026-12-06 12:32:57.000000\", \"status\": \"Pending\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-06 12:32:57.000000\", \"status\": \"Pending\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:15'),
+(1036, NULL, NULL, NULL, 'UPDATE', 'appointments', 151, '{\"new\": {\"date\": \"2026-11-26 22:22:00.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-26 22:22:00.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:15'),
+(1037, NULL, NULL, NULL, 'UPDATE', 'appointments', 226, '{\"new\": {\"date\": \"2026-11-30 12:32:57.000000\", \"status\": \"Rejected\", \"technician_id\": null}, \"old\": {\"date\": \"2025-11-30 12:32:57.000000\", \"status\": \"Rejected\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:15'),
+(1038, NULL, NULL, NULL, 'UPDATE', 'appointments', 94, '{\"new\": {\"date\": \"2026-12-12 07:23:51.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-12-12 07:23:51.000000\", \"status\": \"Confirmed\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:15'),
+(1039, NULL, NULL, NULL, 'UPDATE', 'appointments', 131, '{\"new\": {\"date\": \"2026-06-19 19:19:59.000000\", \"status\": \"Cancelled\", \"technician_id\": null}, \"old\": {\"date\": \"2025-06-19 19:19:59.000000\", \"status\": \"Cancelled\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:15'),
+(1040, NULL, NULL, NULL, 'UPDATE', 'appointments', 100, '{\"new\": {\"date\": \"2026-09-22 21:09:58.000000\", \"status\": \"Completed\", \"technician_id\": 9}, \"old\": {\"date\": \"2025-09-22 21:09:58.000000\", \"status\": \"Completed\", \"technician_id\": 9}}', NULL, '2026-05-27 03:34:15'),
+(1041, NULL, NULL, NULL, 'UPDATE', 'appointments', 93, '{\"new\": {\"date\": \"2026-11-24 18:59:12.000000\", \"status\": \"Cancelled\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-11-24 18:59:12.000000\", \"status\": \"Cancelled\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:15'),
+(1042, NULL, NULL, NULL, 'UPDATE', 'appointments', 82, '{\"new\": {\"date\": \"2026-10-07 16:16:19.000000\", \"status\": \"Completed\", \"technician_id\": 11}, \"old\": {\"date\": \"2025-10-07 16:16:19.000000\", \"status\": \"Completed\", \"technician_id\": 11}}', NULL, '2026-05-27 03:34:15'),
+(1043, NULL, NULL, NULL, 'UPDATE', 'appointments', 162, '{\"new\": {\"date\": \"2026-11-28 23:26:00.000000\", \"status\": \"Cancelled\", \"technician_id\": 4}, \"old\": {\"date\": \"2025-11-28 23:26:00.000000\", \"status\": \"Cancelled\", \"technician_id\": 4}}', NULL, '2026-05-27 03:34:15'),
+(1044, NULL, NULL, NULL, 'UPDATE', 'appointments', 19, '{\"new\": {\"date\": \"2026-12-06 15:28:36.000000\", \"status\": \"Pending\", \"technician_id\": null}, \"old\": {\"date\": \"2025-12-06 15:28:36.000000\", \"status\": \"Pending\", \"technician_id\": null}}', NULL, '2026-05-27 03:34:15');
 
 -- --------------------------------------------------------
 
@@ -1093,12 +1289,12 @@ INSERT INTO `audit_logs` (`log_id`, `user_id`, `actor_role`, `actor_username`, `
 --
 
 CREATE TABLE `customer_addresses` (
-  `address_id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `address_label` varchar(50) DEFAULT 'Home',
-  `address_line` text NOT NULL,
-  `is_default` tinyint(1) DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `address_id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `address_label` varchar(50) COLLATE utf8mb4_general_ci DEFAULT 'Home',
+  `address_line` text COLLATE utf8mb4_general_ci NOT NULL,
+  `is_default` tinyint(1) DEFAULT '0',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -1114,7 +1310,152 @@ INSERT INTO `customer_addresses` (`address_id`, `user_id`, `address_label`, `add
 (6, 11, 'Home', 'Manila', 1, '2025-11-28 13:52:30'),
 (7, 12, 'Home', 'Manila', 1, '2025-11-28 13:52:30'),
 (8, 33, 'Home', '123 Main St, Nasugbu, Batangas', 1, '2025-11-28 13:52:30'),
-(16, 2, 'Saved Address', 'Tumalim, Nasugbu, Batangas', 0, '2025-11-28 14:25:03');
+(16, 2, 'Saved Address', 'Tumalim, Nasugbu, Batangas', 0, '2025-11-28 14:25:03'),
+(17, 20, 'Saved Address', 'Tumalim, Nasugbu, Batangas', 0, '2026-05-27 00:11:47'),
+(18, 23, 'Saved Address', 'Lian, Batangas', 0, '2026-05-27 03:05:20');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `inventory_categories`
+--
+
+CREATE TABLE `inventory_categories` (
+  `category_id` int NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `description` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `inventory_categories`
+--
+
+INSERT INTO `inventory_categories` (`category_id`, `name`, `description`, `created_at`) VALUES
+(1, 'Cameras', 'CCTV cameras and imaging devices', '2026-05-26 14:12:21'),
+(2, 'Recording & Storage', 'Recorders, drives, and storage media', '2026-05-26 14:12:21'),
+(3, 'Cabling & Connectors', 'Cables, connectors, and terminations', '2026-05-26 14:12:21'),
+(4, 'Power & Protection', 'Power supplies and protection devices', '2026-05-26 14:12:21'),
+(5, 'Networking', 'Network switches, routers, and injectors', '2026-05-26 14:12:21'),
+(6, 'Mounting & Accessories', 'Mounts, junction boxes, and conduits', '2026-05-26 14:12:21'),
+(7, 'Computer Parts', 'PC components and replacements', '2026-05-26 14:12:21'),
+(8, 'Tools & Consumables', 'Consumables and small shop items', '2026-05-26 14:12:21');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `inventory_items`
+--
+
+CREATE TABLE `inventory_items` (
+  `item_id` int NOT NULL,
+  `sku` varchar(50) DEFAULT NULL,
+  `name` varchar(150) NOT NULL,
+  `image_path` varchar(255) DEFAULT NULL,
+  `category_id` int DEFAULT NULL,
+  `unit` varchar(20) DEFAULT 'pcs',
+  `unit_cost` decimal(10,2) DEFAULT '0.00',
+  `unit_price` decimal(10,2) DEFAULT '0.00',
+  `reorder_level` decimal(10,2) DEFAULT '0.00',
+  `is_active` tinyint(1) DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `inventory_items`
+--
+
+INSERT INTO `inventory_items` (`item_id`, `sku`, `name`, `image_path`, `category_id`, `unit`, `unit_cost`, `unit_price`, `reorder_level`, `is_active`, `created_at`, `updated_at`) VALUES
+(1, 'CAM-DOME-4MP', '4MP Dome Camera', '/uploads/inventory/DS-2CD2543G0-IS.jpeg', 1, 'pcs', 1200.00, 1800.00, 5.00, 1, '2026-05-26 14:12:21', '2026-05-26 23:19:12'),
+(2, 'CAM-BULLET-4MP', '4MP Bullet Camera', '/uploads/inventory/images.jpg', 1, 'pcs', 1300.00, 1900.00, 5.00, 1, '2026-05-26 14:12:21', '2026-05-26 23:19:48'),
+(3, 'CAM-PTZ-2MP', '2MP PTZ Camera', '/uploads/inventory/DS-2DE4225IW-DE-Hikvision-2MP-IP-4inch-PTZ-Camera.jpeg', 1, 'pcs', 4200.00, 5200.00, 2.00, 1, '2026-05-26 14:12:21', '2026-05-26 23:15:05'),
+(4, 'CAM-INDOOR-2MP', '2MP Indoor Camera', '/uploads/inventory/193660_2024.jpg', 1, 'pcs', 900.00, 1400.00, 3.00, 1, '2026-05-26 14:12:21', '2026-05-26 23:14:55'),
+(5, 'DVR-4CH', '4-Channel DVR', '/uploads/inventory/4-channel-dvr.jpg', 2, 'pcs', 2500.00, 3200.00, 2.00, 1, '2026-05-26 14:12:21', '2026-05-26 23:15:30'),
+(6, 'DVR-8CH', '8-Channel DVR', '/uploads/inventory/DVR-8CH.jpg', 2, 'pcs', 3600.00, 4500.00, 2.00, 1, '2026-05-26 14:12:21', '2026-05-26 18:29:59'),
+(7, 'NVR-4CH', '4-Channel NVR', '/uploads/inventory/images (5).jpg', 2, 'pcs', 3200.00, 4200.00, 2.00, 1, '2026-05-26 14:12:21', '2026-05-26 23:16:37'),
+(8, 'HDD-1TB', '1TB Surveillance HDD', '/uploads/inventory/surveillance.jpg', 2, 'pcs', 1400.00, 1900.00, 5.00, 1, '2026-05-26 14:12:21', '2026-05-26 23:10:01'),
+(9, 'HDD-2TB', '2TB Surveillance HDD', '/uploads/inventory/WesternDigitalPurple2TBWD23PURZSurveillanceHardDrive.jpeg', 2, 'pcs', 2000.00, 2600.00, 4.00, 1, '2026-05-26 14:12:21', '2026-05-26 23:15:15'),
+(10, 'CABLE-RG59', 'RG59 Coax Cable', '/uploads/inventory/CABLE-RG59.jpg', 3, 'm', 20.00, 35.00, 50.00, 1, '2026-05-26 14:12:21', '2026-05-26 18:29:59'),
+(13, 'CONN-RJ45', 'RJ45 Connector', '/uploads/inventory/1525988-40.jpg', 3, 'pcs', 3.00, 8.00, 80.00, 1, '2026-05-26 14:12:21', '2026-05-26 23:18:20'),
+(14, 'CONN-DC', 'DC Barrel Connector', '/uploads/inventory/CONN-DC.jpg', 3, 'pcs', 5.00, 12.00, 30.00, 1, '2026-05-26 14:12:21', '2026-05-26 18:29:59'),
+(15, 'CABLE-POWER', '2-Core Power Cable', '/uploads/inventory/s-l400.jpg', 3, 'm', 10.00, 18.00, 40.00, 1, '2026-05-26 14:12:21', '2026-05-26 23:14:37'),
+(16, 'PSU-12V5A', '12V 5A Power Supply', '/uploads/inventory/png100-t3-scale100.png', 4, 'pcs', 180.00, 280.00, 5.00, 1, '2026-05-26 14:12:21', '2026-05-26 23:10:50'),
+(17, 'PSU-12V10A', '12V 10A Power Supply', '/uploads/inventory/power-supplies-Taxonomy.jpg', 4, 'pcs', 320.00, 480.00, 3.00, 1, '2026-05-26 14:12:21', '2026-05-26 23:10:43'),
+(24, 'CONDUIT-20MM', 'PVC Conduit 20mm', '/uploads/inventory/CONDUIT-20MM.jpg', 6, 'm', 15.00, 25.00, 30.00, 1, '2026-05-26 14:12:21', '2026-05-26 18:29:59'),
+(25, 'RAM-8GB-DDR4', '8GB DDR4 RAM', '/uploads/inventory/66a31807c2f68.jpg', 7, 'pcs', 900.00, 1300.00, 3.00, 1, '2026-05-26 14:12:21', '2026-05-26 23:17:40'),
+(29, 'CABLE-TIE', 'Cable Ties (100 pack)', '/uploads/inventory/CABLE-TIE.jpg', 8, 'pack', 80.00, 140.00, 3.00, 1, '2026-05-26 14:12:21', '2026-05-26 18:29:59'),
+(30, 'TAPE-INS', 'Electrical Tape', '/uploads/inventory/TAPE-INS.jpg', 8, 'roll', 25.00, 45.00, 8.00, 1, '2026-05-26 14:12:21', '2026-05-26 18:29:59'),
+(31, 'THERMAL-PASTE', 'Thermal Paste', '/uploads/inventory/THERMAL-PASTE.jpg', 8, 'tube', 120.00, 180.00, 3.00, 1, '2026-05-26 14:12:21', '2026-05-26 18:29:59'),
+(63, 'LCD-15INCHES', 'Laptop LCD', '/uploads/inventory/laptop-display-lcd-133-30-pins-hd-with-bracket-gigahertz-gigahertz-224524_1024x.jpeg', 7, 'pcs', 0.00, 4000.00, 5.00, 1, '2026-05-26 23:23:19', '2026-05-26 23:23:19');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `inventory_stock`
+--
+
+CREATE TABLE `inventory_stock` (
+  `item_id` int NOT NULL,
+  `quantity_on_hand` decimal(10,2) DEFAULT '0.00',
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `inventory_stock`
+--
+
+INSERT INTO `inventory_stock` (`item_id`, `quantity_on_hand`, `updated_at`) VALUES
+(1, 12.00, '2026-05-26 14:12:21'),
+(2, 10.00, '2026-05-26 14:12:21'),
+(3, 4.00, '2026-05-26 14:12:21'),
+(4, 8.00, '2026-05-26 14:12:21'),
+(5, 6.00, '2026-05-26 14:12:21'),
+(6, 4.00, '2026-05-26 14:12:21'),
+(7, 4.00, '2026-05-26 14:12:21'),
+(8, 12.00, '2026-05-26 14:12:21'),
+(9, 8.00, '2026-05-26 14:12:21'),
+(10, 200.00, '2026-05-26 14:12:21'),
+(13, 200.00, '2026-05-26 14:12:21'),
+(14, 100.00, '2026-05-26 14:12:21'),
+(15, 150.00, '2026-05-26 14:12:21'),
+(16, 14.00, '2026-05-26 18:41:39'),
+(17, 8.00, '2026-05-26 14:12:21'),
+(24, 120.00, '2026-05-26 14:12:21'),
+(25, 8.00, '2026-05-26 14:12:21'),
+(29, 10.00, '2026-05-26 14:12:21'),
+(30, 20.00, '2026-05-26 14:12:21'),
+(31, 10.00, '2026-05-26 14:12:21'),
+(63, 23.00, '2026-05-27 03:06:34');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `inventory_transactions`
+--
+
+CREATE TABLE `inventory_transactions` (
+  `transaction_id` int NOT NULL,
+  `item_id` int NOT NULL,
+  `change_qty` decimal(10,2) NOT NULL,
+  `transaction_type` enum('adjustment','usage','restock','correction') NOT NULL,
+  `reference_type` varchar(50) DEFAULT NULL,
+  `reference_id` int DEFAULT NULL,
+  `note` text,
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `inventory_transactions`
+--
+
+INSERT INTO `inventory_transactions` (`transaction_id`, `item_id`, `change_qty`, `transaction_type`, `reference_type`, `reference_id`, `note`, `created_by`, `created_at`) VALUES
+(1, 16, -1.00, 'adjustment', 'manual', NULL, NULL, 1, '2026-05-26 18:41:39'),
+(5, 63, 20.00, 'restock', 'initial', NULL, 'Initial stock', 1, '2026-05-26 23:23:19'),
+(6, 63, 5.00, 'restock', 'manual', NULL, NULL, 1, '2026-05-26 23:24:18'),
+(7, 63, -1.00, 'usage', 'appointment', 257, 'Parts used for appointment', 4, '2026-05-27 00:12:54'),
+(8, 63, -1.00, 'usage', 'appointment', 258, 'Parts used for appointment', 4, '2026-05-27 03:06:34');
 
 -- --------------------------------------------------------
 
@@ -1123,13 +1464,13 @@ INSERT INTO `customer_addresses` (`address_id`, `user_id`, `address_label`, `add
 --
 
 CREATE TABLE `login_history` (
-  `history_id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `ip_address` varchar(45) DEFAULT NULL,
-  `user_agent` text DEFAULT NULL,
-  `success` tinyint(1) DEFAULT 1,
-  `failure_reason` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `history_id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `ip_address` varchar(45) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `user_agent` text COLLATE utf8mb4_general_ci,
+  `success` tinyint(1) DEFAULT '1',
+  `failure_reason` text COLLATE utf8mb4_general_ci,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -1154,7 +1495,44 @@ INSERT INTO `login_history` (`history_id`, `user_id`, `ip_address`, `user_agent`
 (15, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', 1, NULL, '2025-12-01 12:23:37'),
 (16, 2, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', 1, NULL, '2025-12-01 12:27:56'),
 (17, 3, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', 1, NULL, '2025-12-01 13:06:49'),
-(18, 4, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', 1, NULL, '2025-12-01 13:08:16');
+(18, 4, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', 1, NULL, '2025-12-01 13:08:16'),
+(19, 1, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 13:17:23'),
+(20, 3, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 13:18:40'),
+(21, 2, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 13:21:32'),
+(22, 4, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 13:22:16'),
+(23, 1, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 13:23:39'),
+(24, 4, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 13:25:02'),
+(25, 1, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 13:29:01'),
+(26, 2, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 13:33:26'),
+(27, 4, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 13:33:35'),
+(28, 1, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 13:52:02'),
+(29, 2, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 13:52:23'),
+(30, 3, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 13:52:43'),
+(31, 3, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 13:53:02'),
+(32, 4, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 13:53:14'),
+(33, 1, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 14:04:46'),
+(34, 1, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 14:13:38'),
+(35, 1, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 17:52:38'),
+(36, 4, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 17:52:49'),
+(37, 2, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 18:48:28'),
+(38, 1, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 22:46:51'),
+(39, 1, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 22:47:00'),
+(40, 4, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 22:47:50'),
+(41, 4, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 23:00:07'),
+(42, 2, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 23:49:12'),
+(43, 4, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-26 23:51:42'),
+(44, 20, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-27 00:10:24'),
+(45, 3, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 0, 'Invalid password', '2026-05-27 00:12:05'),
+(46, 3, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-27 00:12:10'),
+(47, 1, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.121.0 Chrome/142.0.7444.265 Electron/39.8.8 Safari/537.36', 1, NULL, '2026-05-27 00:44:30'),
+(48, 1, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.121.0 Chrome/142.0.7444.265 Electron/39.8.8 Safari/537.36', 1, NULL, '2026-05-27 00:49:11'),
+(49, 1, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-27 03:01:18'),
+(50, 23, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-27 03:04:58'),
+(51, 4, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-27 03:06:07'),
+(52, 23, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-27 03:12:37'),
+(53, 1, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.121.0 Chrome/142.0.7444.265 Electron/39.8.8 Safari/537.36', 1, NULL, '2026-05-27 03:20:08'),
+(54, 1, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Cursor/3.5.33 Chrome/142.0.7444.265 Electron/39.8.1 Safari/537.36', 1, NULL, '2026-05-27 04:09:23'),
+(55, 1, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36', 1, NULL, '2026-05-27 05:04:49');
 
 -- --------------------------------------------------------
 
@@ -1163,13 +1541,13 @@ INSERT INTO `login_history` (`history_id`, `user_id`, `ip_address`, `user_agent`
 --
 
 CREATE TABLE `notifications` (
-  `notification_id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `title` enum('Appointment Approved','Appointment Rejected','Appointment Cancelled','Appointment Completed','New Job Assigned','Reminder') NOT NULL,
-  `message` text NOT NULL,
-  `is_read` tinyint(1) DEFAULT 0,
-  `related_appointment_id` int(11) DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `notification_id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `title` enum('Appointment Approved','Appointment Rejected','Appointment Cancelled','Appointment Completed','New Job Assigned','Reminder') COLLATE utf8mb4_general_ci NOT NULL,
+  `message` text COLLATE utf8mb4_general_ci NOT NULL,
+  `is_read` tinyint(1) DEFAULT '0',
+  `related_appointment_id` int DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -1429,7 +1807,18 @@ INSERT INTO `notifications` (`notification_id`, `user_id`, `title`, `message`, `
 (314, 2, 'Appointment Approved', 'Your appointment has been confirmed.', 0, 248, '2025-12-01 14:32:58'),
 (315, 4, 'New Job Assigned', 'You have been assigned to Appointment #248', 0, 248, '2025-12-01 14:32:58'),
 (316, 2, 'Appointment Approved', 'Your appointment has been confirmed.', 0, 252, '2025-12-01 15:02:04'),
-(317, 4, 'New Job Assigned', 'You have been assigned to Appointment #252', 0, 252, '2025-12-01 15:02:04');
+(317, 4, 'New Job Assigned', 'You have been assigned to Appointment #252', 0, 252, '2025-12-01 15:02:04'),
+(318, 2, 'Appointment Approved', 'Your appointment has been confirmed.', 0, NULL, '2026-05-26 14:47:02'),
+(319, 4, 'New Job Assigned', 'You have been assigned to Appointment #254', 0, NULL, '2026-05-26 14:47:02'),
+(320, 2, 'Appointment Approved', 'Your appointment has been confirmed.', 0, 256, '2026-05-26 23:55:00'),
+(321, 4, 'New Job Assigned', 'You have been assigned to Appointment #256', 0, 256, '2026-05-26 23:55:00'),
+(322, 2, 'Appointment Completed', 'Your service is complete. Please rate your technician.', 0, 256, '2026-05-27 00:00:18'),
+(323, 20, 'Appointment Approved', 'Your appointment has been confirmed.', 0, 257, '2026-05-27 00:12:17'),
+(324, 4, 'New Job Assigned', 'You have been assigned to Appointment #257', 0, 257, '2026-05-27 00:12:17'),
+(325, 20, 'Appointment Completed', 'Your service is complete. Please rate your technician.', 0, 257, '2026-05-27 00:12:54'),
+(326, 23, 'Appointment Approved', 'Your appointment has been confirmed.', 0, 258, '2026-05-27 03:05:33'),
+(327, 4, 'New Job Assigned', 'You have been assigned to Appointment #258', 0, 258, '2026-05-27 03:05:33'),
+(328, 23, 'Appointment Completed', 'Your service is complete. Please rate your technician.', 0, 258, '2026-05-27 03:06:34');
 
 -- --------------------------------------------------------
 
@@ -1438,13 +1827,13 @@ INSERT INTO `notifications` (`notification_id`, `user_id`, `title`, `message`, `
 --
 
 CREATE TABLE `payments` (
-  `payment_id` int(11) NOT NULL,
-  `appointment_id` int(11) NOT NULL,
-  `technician_id` int(11) NOT NULL,
+  `payment_id` int NOT NULL,
+  `appointment_id` int NOT NULL,
+  `technician_id` int NOT NULL,
   `total_cost` decimal(10,2) NOT NULL,
-  `currency` varchar(3) DEFAULT 'PHP',
-  `note` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `currency` varchar(3) COLLATE utf8mb4_general_ci DEFAULT 'PHP',
+  `note` text COLLATE utf8mb4_general_ci,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -1454,137 +1843,137 @@ CREATE TABLE `payments` (
 --
 
 CREATE TABLE `reviews` (
-  `review_id` int(11) NOT NULL,
-  `appointment_id` int(11) NOT NULL,
-  `customer_id` int(11) NOT NULL,
-  `technician_id` int(11) NOT NULL,
-  `rating` int(11) DEFAULT NULL CHECK (`rating` >= 1 and `rating` <= 5),
-  `feedback_text` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  `review_id` int NOT NULL,
+  `appointment_id` int NOT NULL,
+  `customer_id` int NOT NULL,
+  `technician_id` int NOT NULL,
+  `rating` int DEFAULT NULL,
+  `feedback_text` text COLLATE utf8mb4_general_ci,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ;
 
 --
 -- Dumping data for table `reviews`
 --
 
 INSERT INTO `reviews` (`review_id`, `appointment_id`, `customer_id`, `technician_id`, `rating`, `feedback_text`, `created_at`) VALUES
-(1, 1, 32, 8, 3, 'Took longer than expected, but the job got done.', '2025-06-21 10:21:04'),
-(2, 2, 28, 12, 5, 'Very happy with the installation. The cameras are crystal clear.', '2025-06-27 19:29:20'),
-(3, 3, 24, 4, 4, 'Satisfied with the installation. Clean work.', '2025-10-14 20:01:18'),
-(4, 4, 18, 9, 5, 'Excellent service! The technician was very professional and efficient.', '2025-07-03 12:14:30'),
-(5, 8, 14, 4, 5, 'Excellent service! The technician was very professional and efficient.', '2025-06-30 01:37:43'),
-(6, 10, 26, 10, 3, 'Took longer than expected, but the job got done.', '2025-10-07 07:24:25'),
-(7, 11, 32, 12, 4, 'Satisfied with the installation. Clean work.', '2025-10-25 22:00:39'),
-(8, 13, 23, 10, 3, 'Average service. The camera works but the angle isn\'t what I asked for.', '2025-09-26 09:17:35'),
-(9, 14, 28, 4, 3, 'Average service. The camera works but the angle isn\'t what I asked for.', '2025-06-29 08:58:45'),
-(10, 17, 31, 9, 5, 'Great job, highly recommended. Fixed the issue quickly.', '2025-06-26 18:34:03'),
-(11, 22, 2, 4, 4, 'Satisfied with the installation. Clean work.', '2025-06-12 08:33:57'),
+(1, 1, 32, 8, 3, 'Took longer than expected, but the job got done.', '2026-11-24 09:18:17'),
+(2, 2, 28, 12, 5, 'Very happy with the installation. The cameras are crystal clear.', '2026-11-24 09:18:17'),
+(3, 3, 24, 4, 4, 'Satisfied with the installation. Clean work.', '2026-11-24 09:18:17'),
+(4, 4, 18, 9, 5, 'Excellent service! The technician was very professional and efficient.', '2026-11-24 09:18:17'),
+(5, 8, 14, 4, 5, 'Excellent service! The technician was very professional and efficient.', '2026-11-24 09:18:17'),
+(6, 10, 26, 10, 3, 'Took longer than expected, but the job got done.', '2026-11-24 09:18:17'),
+(7, 11, 32, 12, 4, 'Satisfied with the installation. Clean work.', '2026-11-24 09:18:17'),
+(8, 13, 23, 10, 3, 'Average service. The camera works but the angle isn\'t what I asked for.', '2026-11-24 09:18:17'),
+(9, 14, 28, 4, 3, 'Average service. The camera works but the angle isn\'t what I asked for.', '2026-11-24 09:18:17'),
+(10, 17, 31, 9, 5, 'Great job, highly recommended. Fixed the issue quickly.', '2026-11-24 09:18:17'),
+(11, 22, 2, 4, 4, 'Satisfied with the installation. Clean work.', '2026-11-24 09:18:17'),
 (12, 26, 17, 12, 5, 'Excellent service! The technician was very professional and efficient.', '2025-09-10 00:35:48'),
-(13, 27, 18, 8, 4, 'Satisfied with the installation. Clean work.', '2025-10-15 21:12:25'),
-(14, 29, 21, 4, 3, 'Took longer than expected, but the job got done.', '2025-10-05 11:36:44'),
-(15, 30, 32, 4, 5, 'Excellent service! The technician was very professional and efficient.', '2025-07-02 10:05:18'),
+(13, 27, 18, 8, 4, 'Satisfied with the installation. Clean work.', '2026-11-24 09:18:17'),
+(14, 29, 21, 4, 3, 'Took longer than expected, but the job got done.', '2026-11-24 09:18:17'),
+(15, 30, 32, 4, 5, 'Excellent service! The technician was very professional and efficient.', '2026-11-24 09:18:17'),
 (16, 31, 18, 12, 4, 'Good service, but arrived a bit late. Work quality was great though.', '2025-08-07 11:35:19'),
-(17, 35, 27, 8, 5, 'Great job, highly recommended. Fixed the issue quickly.', '2025-07-30 04:43:39'),
-(18, 36, 29, 10, 3, 'Took longer than expected, but the job got done.', '2025-06-07 21:35:30'),
+(17, 35, 27, 8, 5, 'Great job, highly recommended. Fixed the issue quickly.', '2026-11-24 09:18:17'),
+(18, 36, 29, 10, 3, 'Took longer than expected, but the job got done.', '2026-11-24 09:18:17'),
 (19, 41, 20, 4, 5, 'Very happy with the installation. The cameras are crystal clear.', '2025-10-30 03:25:27'),
-(20, 43, 13, 9, 3, 'Took longer than expected, but the job got done.', '2025-09-02 19:26:16'),
-(21, 47, 23, 10, 2, 'Technician was rude and left a mess.', '2025-10-19 20:22:09'),
-(22, 52, 27, 9, 4, 'Good service, but arrived a bit late. Work quality was great though.', '2025-09-19 00:05:29'),
-(23, 53, 31, 9, 2, 'Technician was rude and left a mess.', '2025-05-30 01:43:31'),
+(20, 43, 13, 9, 3, 'Took longer than expected, but the job got done.', '2026-11-24 09:18:17'),
+(21, 47, 23, 10, 2, 'Technician was rude and left a mess.', '2026-11-24 09:18:17'),
+(22, 52, 27, 9, 4, 'Good service, but arrived a bit late. Work quality was great though.', '2026-11-24 09:18:17'),
+(23, 53, 31, 9, 2, 'Technician was rude and left a mess.', '2026-11-24 09:18:17'),
 (24, 54, 26, 4, 1, 'Terrible experience. System stopped working after 2 days.', '2025-11-03 20:41:00'),
-(25, 57, 21, 12, 1, 'Terrible experience. System stopped working after 2 days.', '2025-10-16 03:00:04'),
-(26, 59, 26, 10, 5, 'Great job, highly recommended. Fixed the issue quickly.', '2025-07-26 00:11:18'),
+(25, 57, 21, 12, 1, 'Terrible experience. System stopped working after 2 days.', '2026-11-24 09:18:17'),
+(26, 59, 26, 10, 5, 'Great job, highly recommended. Fixed the issue quickly.', '2026-11-24 09:18:17'),
 (27, 60, 2, 4, 5, 'Great job, highly recommended. Fixed the issue quickly.', '2025-08-03 18:35:59'),
 (28, 69, 20, 4, 4, 'Satisfied with the installation. Clean work.', '2025-06-29 07:54:37'),
-(29, 70, 13, 9, 3, 'Took longer than expected, but the job got done.', '2025-09-11 19:30:12'),
-(30, 71, 16, 10, 5, 'Excellent service! The technician was very professional and efficient.', '2025-09-04 01:15:45'),
-(31, 72, 13, 9, 2, 'Technician was rude and left a mess.', '2025-11-04 03:29:20'),
-(32, 73, 31, 4, 2, 'Technician was rude and left a mess.', '2025-06-28 08:16:48'),
-(33, 74, 2, 4, 5, 'Great job, highly recommended. Fixed the issue quickly.', '2025-08-08 14:15:16'),
-(34, 81, 32, 11, 3, 'Took longer than expected, but the job got done.', '2025-11-16 01:48:06'),
-(35, 82, 19, 11, 3, 'Average service. The camera works but the angle isn\'t what I asked for.', '2025-10-13 07:07:13'),
-(36, 85, 30, 9, 4, 'Satisfied with the installation. Clean work.', '2025-09-20 12:57:05'),
-(37, 87, 32, 4, 5, 'Very happy with the installation. The cameras are crystal clear.', '2025-07-16 21:00:53'),
-(38, 89, 26, 9, 5, 'Very happy with the installation. The cameras are crystal clear.', '2025-06-15 06:55:34'),
-(39, 90, 2, 11, 5, 'Very happy with the installation. The cameras are crystal clear.', '2025-07-19 23:50:22'),
-(40, 92, 16, 4, 2, 'Technician was rude and left a mess.', '2025-09-25 13:45:47'),
-(41, 95, 27, 9, 3, 'Average service. The camera works but the angle isn\'t what I asked for.', '2025-08-14 01:15:39'),
-(42, 98, 32, 12, 5, 'Excellent service! The technician was very professional and efficient.', '2025-09-25 00:58:51'),
+(29, 70, 13, 9, 3, 'Took longer than expected, but the job got done.', '2026-11-24 09:18:17'),
+(30, 71, 16, 10, 5, 'Excellent service! The technician was very professional and efficient.', '2026-11-24 09:18:17'),
+(31, 72, 13, 9, 2, 'Technician was rude and left a mess.', '2026-11-24 09:18:17'),
+(32, 73, 31, 4, 2, 'Technician was rude and left a mess.', '2026-11-24 09:18:17'),
+(33, 74, 2, 4, 5, 'Great job, highly recommended. Fixed the issue quickly.', '2026-11-24 09:18:17'),
+(34, 81, 32, 11, 3, 'Took longer than expected, but the job got done.', '2026-11-24 09:18:17'),
+(35, 82, 19, 11, 3, 'Average service. The camera works but the angle isn\'t what I asked for.', '2026-11-24 09:18:17'),
+(36, 85, 30, 9, 4, 'Satisfied with the installation. Clean work.', '2026-11-24 09:18:17'),
+(37, 87, 32, 4, 5, 'Very happy with the installation. The cameras are crystal clear.', '2026-11-24 09:18:17'),
+(38, 89, 26, 9, 5, 'Very happy with the installation. The cameras are crystal clear.', '2026-11-24 09:18:17'),
+(39, 90, 2, 11, 5, 'Very happy with the installation. The cameras are crystal clear.', '2026-11-24 09:18:17'),
+(40, 92, 16, 4, 2, 'Technician was rude and left a mess.', '2026-11-24 09:18:17'),
+(41, 95, 27, 9, 3, 'Average service. The camera works but the angle isn\'t what I asked for.', '2026-11-24 09:18:17'),
+(42, 98, 32, 12, 5, 'Excellent service! The technician was very professional and efficient.', '2026-11-24 09:18:17'),
 (43, 99, 25, 12, 5, 'Great job, highly recommended. Fixed the issue quickly.', '2025-08-27 14:14:24'),
-(44, 102, 22, 10, 4, 'Satisfied with the installation. Clean work.', '2025-11-02 03:44:09'),
-(45, 103, 13, 8, 2, 'Technician was rude and left a mess.', '2025-10-02 13:29:19'),
-(46, 107, 19, 11, 4, 'Good service, but arrived a bit late. Work quality was great though.', '2025-07-01 05:58:54'),
-(47, 110, 16, 9, 1, 'Terrible experience. System stopped working after 2 days.', '2025-07-02 05:35:29'),
-(48, 113, 26, 9, 2, 'Technician was rude and left a mess.', '2025-06-03 21:31:40'),
-(49, 114, 28, 8, 5, 'Excellent service! The technician was very professional and efficient.', '2025-08-16 15:46:31'),
-(50, 115, 19, 11, 5, 'Great job, highly recommended. Fixed the issue quickly.', '2025-09-07 00:59:35'),
-(51, 116, 19, 10, 5, 'Excellent service! The technician was very professional and efficient.', '2025-08-26 21:36:49'),
-(52, 117, 14, 10, 5, 'Excellent service! The technician was very professional and efficient.', '2025-11-13 04:25:05'),
-(53, 118, 28, 10, 3, 'Average service. The camera works but the angle isn\'t what I asked for.', '2025-06-27 12:41:56'),
-(54, 120, 29, 4, 1, 'Terrible experience. System stopped working after 2 days.', '2025-11-17 05:56:10'),
-(55, 122, 25, 4, 3, 'Took longer than expected, but the job got done.', '2025-09-10 09:25:52'),
-(56, 124, 2, 10, 4, 'Good service, but arrived a bit late. Work quality was great though.', '2025-08-06 20:19:54'),
-(57, 126, 27, 8, 1, 'Terrible experience. System stopped working after 2 days.', '2025-09-29 03:31:31'),
-(58, 128, 28, 12, 5, 'Very happy with the installation. The cameras are crystal clear.', '2025-11-03 00:54:38'),
-(59, 129, 26, 8, 1, 'Terrible experience. System stopped working after 2 days.', '2025-07-20 05:44:53'),
-(60, 130, 2, 4, 3, 'Took longer than expected, but the job got done.', '2025-09-02 08:20:46'),
-(61, 134, 31, 10, 5, 'Great job, highly recommended. Fixed the issue quickly.', '2025-07-16 12:09:51'),
-(62, 141, 31, 8, 5, 'Excellent service! The technician was very professional and efficient.', '2025-09-07 16:18:09'),
-(63, 142, 14, 11, 5, 'Very happy with the installation. The cameras are crystal clear.', '2025-08-26 01:48:51'),
-(64, 146, 27, 8, 3, 'Average service. The camera works but the angle isn\'t what I asked for.', '2025-11-07 01:03:55'),
-(65, 147, 15, 12, 3, 'Average service. The camera works but the angle isn\'t what I asked for.', '2025-08-25 10:21:35'),
-(66, 150, 30, 11, 5, 'Very happy with the installation. The cameras are crystal clear.', '2025-10-17 22:18:47'),
-(67, 66, 2, 4, 4, 'wow ang galing sheesh', '2025-11-28 11:51:06'),
-(68, 158, 2, 4, 5, 'tysm\n', '2025-11-28 14:20:55'),
-(69, 163, 2, 4, 4, 'nice', '2025-11-28 15:42:44'),
-(71, 9, 23, 12, 3, 'Technician was on time.', '2025-12-01 04:32:57'),
-(72, 12, 31, 11, 4, 'Technician was on time.', '2025-12-01 04:32:57'),
+(44, 102, 22, 10, 4, 'Satisfied with the installation. Clean work.', '2026-11-24 09:18:17'),
+(45, 103, 13, 8, 2, 'Technician was rude and left a mess.', '2026-11-24 09:18:17'),
+(46, 107, 19, 11, 4, 'Good service, but arrived a bit late. Work quality was great though.', '2026-11-24 09:18:17'),
+(47, 110, 16, 9, 1, 'Terrible experience. System stopped working after 2 days.', '2026-11-24 09:18:17'),
+(48, 113, 26, 9, 2, 'Technician was rude and left a mess.', '2026-11-24 09:18:17'),
+(49, 114, 28, 8, 5, 'Excellent service! The technician was very professional and efficient.', '2026-11-24 09:18:17'),
+(50, 115, 19, 11, 5, 'Great job, highly recommended. Fixed the issue quickly.', '2026-11-24 09:18:17'),
+(51, 116, 19, 10, 5, 'Excellent service! The technician was very professional and efficient.', '2026-11-24 09:18:17'),
+(52, 117, 14, 10, 5, 'Excellent service! The technician was very professional and efficient.', '2026-11-24 09:18:17'),
+(53, 118, 28, 10, 3, 'Average service. The camera works but the angle isn\'t what I asked for.', '2026-11-24 09:18:17'),
+(54, 120, 29, 4, 1, 'Terrible experience. System stopped working after 2 days.', '2026-11-24 09:18:17'),
+(55, 122, 25, 4, 3, 'Took longer than expected, but the job got done.', '2026-11-24 09:18:17'),
+(56, 124, 2, 10, 4, 'Good service, but arrived a bit late. Work quality was great though.', '2026-11-24 09:18:17'),
+(57, 126, 27, 8, 1, 'Terrible experience. System stopped working after 2 days.', '2026-11-24 09:18:17'),
+(58, 128, 28, 12, 5, 'Very happy with the installation. The cameras are crystal clear.', '2026-11-24 09:18:17'),
+(59, 129, 26, 8, 1, 'Terrible experience. System stopped working after 2 days.', '2026-11-24 09:18:17'),
+(60, 130, 2, 4, 3, 'Took longer than expected, but the job got done.', '2026-11-24 09:18:17'),
+(61, 134, 31, 10, 5, 'Great job, highly recommended. Fixed the issue quickly.', '2026-11-24 09:18:17'),
+(62, 141, 31, 8, 5, 'Excellent service! The technician was very professional and efficient.', '2026-11-24 09:18:17'),
+(63, 142, 14, 11, 5, 'Very happy with the installation. The cameras are crystal clear.', '2026-11-24 09:18:17'),
+(64, 146, 27, 8, 3, 'Average service. The camera works but the angle isn\'t what I asked for.', '2026-11-24 09:18:17'),
+(65, 147, 15, 12, 3, 'Average service. The camera works but the angle isn\'t what I asked for.', '2026-11-24 09:18:17'),
+(66, 150, 30, 11, 5, 'Very happy with the installation. The cameras are crystal clear.', '2026-11-24 09:18:17'),
+(67, 66, 2, 4, 4, 'wow ang galing sheesh', '2026-11-24 09:18:17'),
+(68, 158, 2, 4, 5, 'tysm\n', '2026-11-28 12:17:07'),
+(69, 163, 2, 4, 4, 'nice', '2026-11-28 14:25:03'),
+(71, 9, 23, 12, 3, 'Technician was on time.', '2026-11-24 09:18:17'),
+(72, 12, 31, 11, 4, 'Technician was on time.', '2026-11-24 09:18:17'),
 (73, 15, 24, 4, 5, 'Great service!', '2025-12-01 04:32:57'),
-(74, 28, 21, 8, 4, 'Very professional.', '2025-12-01 04:32:57'),
-(75, 55, 23, 10, 5, 'Satisfied with the work.', '2025-12-01 04:32:57'),
+(74, 28, 21, 8, 4, 'Very professional.', '2026-11-24 09:18:17'),
+(75, 55, 23, 10, 5, 'Satisfied with the work.', '2026-11-24 09:18:17'),
 (76, 56, 21, 9, 4, 'Technician was on time.', '2025-12-01 04:32:57'),
-(77, 67, 29, 12, 4, 'Very professional.', '2025-12-01 04:32:57'),
-(78, 68, 19, 9, 5, 'Good job.', '2025-12-01 04:32:57'),
-(79, 77, 28, 12, 3, 'Great service!', '2025-12-01 04:32:57'),
+(77, 67, 29, 12, 4, 'Very professional.', '2026-11-24 09:18:17'),
+(78, 68, 19, 9, 5, 'Good job.', '2026-11-24 09:18:17'),
+(79, 77, 28, 12, 3, 'Great service!', '2026-11-24 09:18:17'),
 (80, 83, 17, 8, 5, 'Technician was on time.', '2025-12-01 04:32:57'),
-(81, 86, 16, 10, 4, 'Good job.', '2025-12-01 04:32:57'),
+(81, 86, 16, 10, 4, 'Good job.', '2026-11-24 09:18:17'),
 (82, 88, 15, 4, 3, 'Satisfied with the work.', '2025-12-01 04:32:57'),
-(83, 100, 29, 9, 4, 'Very professional.', '2025-12-01 04:32:57'),
-(84, 101, 2, 11, 5, 'Very professional.', '2025-12-01 04:32:57'),
-(85, 112, 32, 8, 3, 'Good job.', '2025-12-01 04:32:57'),
-(86, 123, 32, 12, 4, 'Good job.', '2025-12-01 04:32:57'),
-(87, 132, 24, 4, 5, 'Great service!', '2025-12-01 04:32:57'),
-(88, 133, 22, 8, 3, 'Technician was on time.', '2025-12-01 04:32:57'),
-(89, 137, 25, 12, 5, 'Very professional.', '2025-12-01 04:32:57'),
-(90, 138, 2, 9, 5, 'Good job.', '2025-12-01 04:32:57'),
-(91, 139, 26, 12, 3, 'Good job.', '2025-12-01 04:32:57'),
-(92, 144, 19, 9, 3, 'Great service!', '2025-12-01 04:32:57'),
-(93, 148, 16, 4, 5, 'Technician was on time.', '2025-12-01 04:32:57'),
-(94, 149, 31, 9, 3, 'Technician was on time.', '2025-12-01 04:32:57'),
-(95, 152, 33, 4, 3, 'Very professional.', '2025-12-01 04:32:57'),
-(96, 154, 2, 4, 3, 'Good job.', '2025-12-01 04:32:57'),
-(97, 165, 2, 4, 3, 'Great service!', '2025-12-01 04:32:57'),
-(98, 171, 33, 10, 3, 'Technician was on time.', '2025-12-01 04:32:57'),
-(99, 172, 24, 8, 4, 'Technician was on time.', '2025-12-01 04:32:57'),
-(100, 173, 26, 12, 4, 'Good job.', '2025-12-01 04:32:57'),
-(101, 174, 14, 9, 5, 'Good job.', '2025-12-01 04:32:57'),
-(102, 175, 16, 8, 4, 'Very professional.', '2025-12-01 04:32:57'),
+(83, 100, 29, 9, 4, 'Very professional.', '2026-11-24 09:18:17'),
+(84, 101, 2, 11, 5, 'Very professional.', '2026-11-24 09:18:17'),
+(85, 112, 32, 8, 3, 'Good job.', '2026-11-24 09:18:17'),
+(86, 123, 32, 12, 4, 'Good job.', '2026-11-24 09:18:17'),
+(87, 132, 24, 4, 5, 'Great service!', '2026-11-24 09:18:17'),
+(88, 133, 22, 8, 3, 'Technician was on time.', '2026-11-24 09:18:17'),
+(89, 137, 25, 12, 5, 'Very professional.', '2026-11-24 09:18:17'),
+(90, 138, 2, 9, 5, 'Good job.', '2026-11-24 09:18:17'),
+(91, 139, 26, 12, 3, 'Good job.', '2026-11-24 09:18:17'),
+(92, 144, 19, 9, 3, 'Great service!', '2026-11-24 09:18:17'),
+(93, 148, 16, 4, 5, 'Technician was on time.', '2026-11-24 09:18:17'),
+(94, 149, 31, 9, 3, 'Technician was on time.', '2026-11-24 09:18:17'),
+(95, 152, 33, 4, 3, 'Very professional.', '2026-11-26 09:41:18'),
+(96, 154, 2, 4, 3, 'Good job.', '2026-11-26 13:45:59'),
+(97, 165, 2, 4, 3, 'Great service!', '2026-11-28 16:23:19'),
+(98, 171, 33, 10, 3, 'Technician was on time.', '2026-12-01 04:32:57'),
+(99, 172, 24, 8, 4, 'Technician was on time.', '2026-12-01 04:32:57'),
+(100, 173, 26, 12, 4, 'Good job.', '2026-12-01 04:32:57'),
+(101, 174, 14, 9, 5, 'Good job.', '2026-12-01 04:32:57'),
+(102, 175, 16, 8, 4, 'Very professional.', '2026-12-01 04:32:57'),
 (103, 176, 31, 4, 3, 'Great service!', '2025-12-01 04:32:57'),
-(104, 177, 17, 5, 5, 'Great service!', '2025-12-01 04:32:57'),
-(105, 178, 25, 9, 5, 'Good job.', '2025-12-01 04:32:57'),
-(106, 179, 19, 10, 5, 'Satisfied with the work.', '2025-12-01 04:32:57'),
-(107, 180, 29, 8, 4, 'Good job.', '2025-12-01 04:32:57'),
+(104, 177, 17, 5, 5, 'Great service!', '2026-12-01 04:32:57'),
+(105, 178, 25, 9, 5, 'Good job.', '2026-12-01 04:32:57'),
+(106, 179, 19, 10, 5, 'Satisfied with the work.', '2026-12-01 04:32:57'),
+(107, 180, 29, 8, 4, 'Good job.', '2026-12-01 04:32:57'),
 (108, 181, 2, 5, 5, 'Satisfied with the work.', '2025-12-01 04:32:57'),
-(109, 182, 2, 9, 3, 'Very professional.', '2025-12-01 04:32:57'),
+(109, 182, 2, 9, 3, 'Very professional.', '2026-12-01 04:32:57'),
 (110, 183, 30, 9, 4, 'Very professional.', '2025-12-01 04:32:57'),
 (111, 184, 16, 4, 4, 'Technician was on time.', '2025-12-01 04:32:57'),
 (112, 185, 20, 9, 5, 'Technician was on time.', '2025-12-01 04:32:57'),
 (113, 186, 27, 9, 4, 'Very professional.', '2025-12-01 04:32:57'),
-(114, 187, 21, 8, 3, 'Good job.', '2025-12-01 04:32:57'),
-(115, 188, 28, 9, 5, 'Technician was on time.', '2025-12-01 04:32:57'),
+(114, 187, 21, 8, 3, 'Good job.', '2026-12-01 04:32:57'),
+(115, 188, 28, 9, 5, 'Technician was on time.', '2026-12-01 04:32:57'),
 (116, 189, 15, 4, 3, 'Great service!', '2025-12-01 04:32:57'),
 (117, 190, 32, 11, 3, 'Great service!', '2025-12-01 04:32:57'),
-(134, 166, 2, 4, 5, 'thank you for the service!!', '2025-12-01 04:46:49');
+(134, 166, 2, 4, 5, 'thank you for the service!!', '2026-11-30 15:56:11');
 
 --
 -- Triggers `reviews`
@@ -1605,31 +1994,30 @@ DELIMITER ;
 --
 
 CREATE TABLE `services` (
-  `service_id` int(11) NOT NULL,
-  `category_id` int(11) NOT NULL,
-  `name` varchar(100) NOT NULL,
-  `description` text DEFAULT NULL,
-  `image` varchar(255) DEFAULT NULL,
+  `service_id` int NOT NULL,
+  `category_id` int NOT NULL,
+  `name` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `description` text COLLATE utf8mb4_general_ci,
+  `image` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
   `estimated_price` decimal(10,2) DEFAULT NULL,
-  `price_type` enum('Fixed','Starting At','Quote Required') DEFAULT 'Fixed',
-  `duration_minutes` int(11) DEFAULT 60,
-  `is_active` tinyint(1) DEFAULT 1,
-  `estimate_price` decimal(10,2) DEFAULT 0.00
+  `price_type` enum('Fixed','Starting At','Quote Required') COLLATE utf8mb4_general_ci DEFAULT 'Fixed',
+  `duration_minutes` int DEFAULT '60',
+  `is_active` tinyint(1) DEFAULT '1'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `services`
 --
 
-INSERT INTO `services` (`service_id`, `category_id`, `name`, `description`, `image`, `estimated_price`, `price_type`, `duration_minutes`, `is_active`, `estimate_price`) VALUES
-(1, 1, 'CCTV Installation (Basic)', 'Standard installation of up to 4 CCTV cameras including basic cabling and setup.', '1.jpg', 1500.00, 'Fixed', 120, 1, 0.00),
-(2, 1, 'CCTV Installation (Advanced)', 'Comprehensive installation for larger properties, including advanced camera positioning, extensive cabling, and system integration.', '2.jpg', 2500.00, 'Fixed', 240, 1, 0.00),
-(3, 2, 'CCTV Repair', 'Diagnosis and repair of malfunctioning CCTV cameras, including lens replacement and sensor troubleshooting.', '3.jpg', 1200.00, 'Fixed', 60, 1, 0.00),
-(4, 6, 'System Maintenance', 'Routine check-up and maintenance of your security system to ensure optimal performance and longevity.', '4.jpg', 1200.00, 'Fixed', 90, 1, 0.00),
-(5, 2, 'Laptop/PC repair', 'Professional configuration of Digital Video Recorders (DVR) or Network Video Recorders (NVR) for efficient recording and storage.', '5.jpg', 1000.00, 'Fixed', 60, 1, 0.00),
-(6, 1, 'Cabling & Wiring', 'Structured cabling and wiring services to ensure reliable connectivity and neat organization for your security systems.', '6.jpg', 2000.00, 'Fixed', 180, 1, 0.00),
-(7, 7, 'Remote Viewing Setup', 'Configuration of remote viewing capabilities, allowing you to monitor your property from your smartphone or computer anywhere.', '7.jpg', 500.00, 'Fixed', 45, 1, 0.00),
-(8, 7, 'Security Consultation', 'Expert consultation to assess your security needs and recommend the best surveillance solutions for your property.', '8.jpg', 0.00, 'Fixed', 30, 1, 0.00);
+INSERT INTO `services` (`service_id`, `category_id`, `name`, `description`, `image`, `estimated_price`, `price_type`, `duration_minutes`, `is_active`) VALUES
+(1, 1, 'CCTV Installation (Basic)', 'Standard installation of up to 4 CCTV cameras including basic cabling and setup.', '1.jpg', 1500.00, 'Fixed', 120, 1),
+(2, 1, 'CCTV Installation (Advanced)', 'Comprehensive installation for larger properties, including advanced camera positioning, extensive cabling, and system integration.', '2.jpg', 2500.00, 'Fixed', 240, 1),
+(3, 2, 'CCTV Repair', 'Diagnosis and repair of malfunctioning CCTV cameras, including lens replacement and sensor troubleshooting.', '3.jpg', 1200.00, 'Fixed', 60, 1),
+(4, 6, 'System Maintenance', 'Routine check-up and maintenance of your security system to ensure optimal performance and longevity.', '4.jpg', 1200.00, 'Fixed', 90, 1),
+(5, 2, 'Laptop/PC repair', 'End devices repair', '5.jpg', 1000.00, 'Fixed', 60, 1),
+(6, 1, 'Cabling & Wiring', 'Structured cabling and wiring services to ensure reliable connectivity and neat organization for your security systems.', '6.jpg', 2000.00, 'Fixed', 180, 1),
+(7, 7, 'Remote Viewing Setup', 'Configuration of remote viewing capabilities, allowing you to monitor your property from your smartphone or computer anywhere.', '7.jpg', 500.00, 'Fixed', 45, 1),
+(8, 7, 'Security Consultation', 'Expert consultation to assess your security needs and recommend the best surveillance solutions for your property.', '8.jpg', 0.00, 'Fixed', 30, 1);
 
 -- --------------------------------------------------------
 
@@ -1638,10 +2026,10 @@ INSERT INTO `services` (`service_id`, `category_id`, `name`, `description`, `ima
 --
 
 CREATE TABLE `service_categories` (
-  `category_id` int(11) NOT NULL,
-  `name` varchar(50) NOT NULL,
-  `color` varchar(20) DEFAULT '#9CA3AF',
-  `icon` varchar(50) DEFAULT 'Menu'
+  `category_id` int NOT NULL,
+  `name` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
+  `color` varchar(20) COLLATE utf8mb4_general_ci DEFAULT '#9CA3AF',
+  `icon` varchar(50) COLLATE utf8mb4_general_ci DEFAULT 'Menu'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -1661,13 +2049,13 @@ INSERT INTO `service_categories` (`category_id`, `name`, `color`, `icon`) VALUES
 --
 
 CREATE TABLE `technician_profiles` (
-  `profile_id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `specialty` enum('Hardware Repair','Software Support','Network Setup','Data Recovery','System Maintenance','Virus Removal','Custom Build','Consultation','General') DEFAULT 'General',
-  `bio` text DEFAULT NULL,
-  `availability_status` enum('available','busy','offline') NOT NULL DEFAULT 'offline',
-  `total_jobs_completed` int(11) DEFAULT 0,
-  `average_rating` decimal(3,2) DEFAULT 0.00
+  `profile_id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `specialty` enum('Hardware Repair','Software Support','Network Setup','Data Recovery','System Maintenance','Virus Removal','Custom Build','Consultation','General') COLLATE utf8mb4_general_ci DEFAULT 'General',
+  `bio` text COLLATE utf8mb4_general_ci,
+  `availability_status` enum('available','busy','offline') COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'offline',
+  `total_jobs_completed` int DEFAULT '0',
+  `average_rating` decimal(3,2) DEFAULT '0.00'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -1690,20 +2078,20 @@ INSERT INTO `technician_profiles` (`profile_id`, `user_id`, `specialty`, `bio`, 
 --
 
 CREATE TABLE `users` (
-  `user_id` int(11) NOT NULL,
-  `username` varchar(50) NOT NULL,
-  `first_name` varchar(50) NOT NULL,
-  `last_name` varchar(50) NOT NULL,
-  `email` varchar(100) NOT NULL,
-  `phone_number` varchar(11) NOT NULL,
-  `address` text DEFAULT NULL,
-  `password_hash` varchar(255) NOT NULL,
-  `role` enum('Admin','Receptionist','Technician','Customer') NOT NULL DEFAULT 'Customer',
-  `profile_picture` varchar(255) DEFAULT NULL,
-  `status` enum('Active','Inactive','Banned') DEFAULT 'Active',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `is_online` tinyint(1) NOT NULL DEFAULT 0,
+  `user_id` int NOT NULL,
+  `username` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
+  `first_name` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
+  `last_name` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
+  `email` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `phone_number` varchar(11) COLLATE utf8mb4_general_ci NOT NULL,
+  `address` text COLLATE utf8mb4_general_ci,
+  `password_hash` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `role` enum('Admin','Receptionist','Technician','Customer') COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'Customer',
+  `profile_picture` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `status` enum('Active','Inactive','Banned') COLLATE utf8mb4_general_ci DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `is_online` tinyint(1) NOT NULL DEFAULT '0',
   `last_seen` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -1712,10 +2100,10 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`user_id`, `username`, `first_name`, `last_name`, `email`, `phone_number`, `address`, `password_hash`, `role`, `profile_picture`, `status`, `created_at`, `updated_at`, `is_online`, `last_seen`) VALUES
-(1, 'sherwin', 'Sherwin', 'Arizobal', 'sherwin@gmail.com', '09634045671', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Admin', '/uploads/profile_pics/user-1-1764513611274-916117309.jpg', 'Active', '2025-10-30 08:32:06', '2025-12-01 12:23:37', 1, '2025-12-01 20:23:37'),
-(2, 'edrian', 'Edrian', 'Balingbing', 'edrian@gmail.com', '09955824197', 'Nasugbu, Batangas', '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Customer', '/uploads/profile_pics/user-2-1764514670699-896750777.jpg', 'Active', '2025-11-24 08:34:33', '2025-12-01 12:27:56', 1, '2025-12-01 20:27:56'),
-(3, 'denmark', 'Denmark', 'Cabanhao', 'denmark@gmail.com', '09999999999', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Receptionist', '/uploads/profile_pics/user-3-1764513627435-692111303.jpg', 'Active', '2025-11-07 08:35:44', '2025-12-01 13:06:49', 1, '2025-12-01 21:06:49'),
-(4, 'glenn', 'Glenn', 'Mikko', 'glenn@gmail.com', '09783813287', 'Lian, Batangas', '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Technician', '/uploads/profile_pics/user-4-1764515035935-675372631.jpg', 'Active', '2025-11-01 08:35:44', '2025-12-01 13:08:16', 1, '2025-12-01 21:08:16'),
+(1, 'sherwin', 'Sherwin', 'Arizobal', 'sherwin@gmail.com', '09634045671', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Admin', '/uploads/profile_pics/user-1-1764513611274-916117309.jpg', 'Active', '2025-10-30 08:32:06', '2026-05-27 05:04:49', 1, '2026-05-27 13:04:49'),
+(2, 'jason', 'Jason', 'Villaflor', 'clyde@gmail.com', '09955824197', 'Nasugbu, Batangas', '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Customer', '/uploads/profile_pics/user-2-1764514670699-896750777.jpg', 'Active', '2025-11-24 08:34:33', '2026-05-26 23:49:26', 1, '2026-05-27 07:49:12'),
+(3, 'joyce', 'Joyce', 'Corpus', 'joyce@gmail.com', '09999999999', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Receptionist', '/uploads/profile_pics/user-3-1779804345432-820718179.jpg', 'Active', '2025-11-07 08:35:44', '2026-05-27 00:12:10', 1, '2026-05-27 08:12:10'),
+(4, 'emman', 'Emman', 'Esguerra', 'emman@gmail.com', '09783813287', 'Lian, Batangas', '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Technician', '/uploads/profile_pics/user-4-1779802423043-463661520.jpg', 'Active', '2025-11-01 08:35:44', '2026-05-27 03:06:07', 1, '2026-05-27 11:06:07'),
 (5, 'luna', 'Luna', 'Mariez', 'luna.marie@gmail.com', '09806367741', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Technician', '/uploads/profile_pics/user-5-1764551117663-458445770.jpg', 'Active', '2025-11-24 09:18:17', '2025-12-01 01:14:57', 0, NULL),
 (6, 'sarahconnor', 'Sarah', 'Connor', 'sarah.connor@example.com', '09329465187', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Receptionist', NULL, 'Active', '2025-11-24 09:18:17', '2025-11-24 09:18:17', 0, NULL),
 (7, 'pambeesly', 'Pam', 'Beesly', 'pam.beesly@example.com', '09211063703', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Receptionist', NULL, 'Active', '2025-11-24 09:18:17', '2025-11-24 09:18:17', 0, NULL),
@@ -1731,10 +2119,10 @@ INSERT INTO `users` (`user_id`, `username`, `first_name`, `last_name`, `email`, 
 (17, 'thomasgonzalez4', 'Thomas', 'Gonzalez', 'thomasgonzalez4@example.com', '09772281612', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Customer', NULL, 'Active', '2025-11-24 09:18:17', '2025-11-24 09:18:17', 0, NULL),
 (18, 'williamwilson5', 'William', 'Wilson', 'williamwilson5@example.com', '09454943742', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Customer', NULL, 'Active', '2025-11-24 09:18:17', '2025-11-24 09:18:17', 0, NULL),
 (19, 'josephjones6', 'Joseph', 'Jones', 'josephjones6@example.com', '09528277042', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Customer', NULL, 'Active', '2025-11-24 09:18:17', '2025-11-24 09:18:17', 0, NULL),
-(20, 'davidbrown7', 'David', 'Brown', 'davidbrown7@example.com', '09111949885', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Customer', NULL, 'Active', '2025-11-24 09:18:17', '2025-11-24 09:18:17', 0, NULL),
+(20, 'david', 'David', 'Brown', 'davidbrown7@example.com', '09111949885', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Customer', NULL, 'Active', '2025-11-24 09:18:17', '2026-05-27 00:10:32', 1, '2026-05-27 08:10:24'),
 (21, 'williamgonzalez8', 'William', 'Gonzalez', 'williamgonzalez8@example.com', '09490082945', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Customer', NULL, 'Active', '2025-11-24 09:18:17', '2025-11-24 09:18:17', 0, NULL),
 (22, 'robertwilliams9', 'Robert', 'Williams', 'robertwilliams9@example.com', '09210847636', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Customer', NULL, 'Active', '2025-11-24 09:18:17', '2025-11-24 09:18:17', 0, NULL),
-(23, 'marygonzalez10', 'Mary', 'Gonzalez', 'marygonzalez10@example.com', '09169434857', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Customer', NULL, 'Active', '2025-11-24 09:18:17', '2025-11-24 09:18:17', 0, NULL),
+(23, 'sandara', 'Sandara', 'Maullon', 'sandara@gmail.com', '09169434857', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Customer', '/uploads/profile_pics/user-23-1779851504248-333234799.jpg', 'Active', '2025-11-24 09:18:17', '2026-05-27 03:12:37', 1, '2026-05-27 11:12:37'),
 (24, 'barbararodriguez11', 'Barbara', 'Rodriguez', 'barbararodriguez11@example.com', '09513242060', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Customer', NULL, 'Active', '2025-11-24 09:18:17', '2025-11-24 09:18:17', 0, NULL),
 (25, 'maryrodriguez12', 'Mary', 'Rodriguez', 'maryrodriguez12@example.com', '09251118917', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Customer', NULL, 'Active', '2025-11-24 09:18:17', '2025-11-24 09:18:17', 0, NULL),
 (26, 'marytaylor13', 'Mary', 'Taylor', 'marytaylor13@example.com', '0996895546', NULL, '$2b$10$32KhlcYBYCNObGMou8pQ7.QAKf2dHFgoutDyMlXjOZrStiyOewhUe', 'Customer', NULL, 'Active', '2025-11-24 09:18:17', '2025-11-24 09:18:17', 0, NULL),
@@ -1778,11 +2166,11 @@ DELIMITER ;
 --
 
 CREATE TABLE `user_addresses` (
-  `address_id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `address_line` text NOT NULL,
-  `is_primary` tinyint(1) DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `address_id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `address_line` text COLLATE utf8mb4_general_ci NOT NULL,
+  `is_primary` tinyint(1) DEFAULT '0',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -1798,7 +2186,9 @@ INSERT INTO `user_addresses` (`address_id`, `user_id`, `address_line`, `is_prima
 (6, 11, 'Manila', 1, '2025-11-30 13:42:29'),
 (7, 12, 'Manila', 1, '2025-11-30 13:42:29'),
 (8, 33, '123 Main St, Nasugbu, Batangas', 1, '2025-11-30 13:42:29'),
-(9, 3, 'Lian, Batangas', 1, '2025-12-01 01:15:41');
+(9, 3, 'Lian, Batangas', 1, '2025-12-01 01:15:41'),
+(10, 20, 'Tumalim, Nasugbu, Batangas', 1, '2026-05-27 00:10:51'),
+(11, 23, 'Lian, Batangas', 1, '2026-05-27 03:12:20');
 
 --
 -- Indexes for dumped tables
@@ -1821,6 +2211,13 @@ ALTER TABLE `appointments`
   ADD KEY `idx_appointments_customer` (`customer_id`);
 
 --
+-- Indexes for table `appointment_parts`
+--
+ALTER TABLE `appointment_parts`
+  ADD PRIMARY KEY (`appointment_id`,`item_id`),
+  ADD KEY `idx_appt_parts_item` (`item_id`);
+
+--
 -- Indexes for table `audit_logs`
 --
 ALTER TABLE `audit_logs`
@@ -1835,6 +2232,36 @@ ALTER TABLE `audit_logs`
 ALTER TABLE `customer_addresses`
   ADD PRIMARY KEY (`address_id`),
   ADD KEY `user_id` (`user_id`);
+
+--
+-- Indexes for table `inventory_categories`
+--
+ALTER TABLE `inventory_categories`
+  ADD PRIMARY KEY (`category_id`),
+  ADD UNIQUE KEY `uniq_inventory_category_name` (`name`);
+
+--
+-- Indexes for table `inventory_items`
+--
+ALTER TABLE `inventory_items`
+  ADD PRIMARY KEY (`item_id`),
+  ADD UNIQUE KEY `uniq_inventory_sku` (`sku`),
+  ADD KEY `idx_inventory_category` (`category_id`),
+  ADD KEY `idx_inventory_name` (`name`);
+
+--
+-- Indexes for table `inventory_stock`
+--
+ALTER TABLE `inventory_stock`
+  ADD PRIMARY KEY (`item_id`);
+
+--
+-- Indexes for table `inventory_transactions`
+--
+ALTER TABLE `inventory_transactions`
+  ADD PRIMARY KEY (`transaction_id`),
+  ADD KEY `idx_inventory_tx_item` (`item_id`),
+  ADD KEY `idx_inventory_tx_created` (`created_at`);
 
 --
 -- Indexes for table `login_history`
@@ -1911,73 +2338,91 @@ ALTER TABLE `user_addresses`
 -- AUTO_INCREMENT for table `appointments`
 --
 ALTER TABLE `appointments`
-  MODIFY `appointment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=255;
+  MODIFY `appointment_id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=259;
 
 --
 -- AUTO_INCREMENT for table `audit_logs`
 --
 ALTER TABLE `audit_logs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=842;
+  MODIFY `log_id` int NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `customer_addresses`
 --
 ALTER TABLE `customer_addresses`
-  MODIFY `address_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
+  MODIFY `address_id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+
+--
+-- AUTO_INCREMENT for table `inventory_categories`
+--
+ALTER TABLE `inventory_categories`
+  MODIFY `category_id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+
+--
+-- AUTO_INCREMENT for table `inventory_items`
+--
+ALTER TABLE `inventory_items`
+  MODIFY `item_id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=64;
+
+--
+-- AUTO_INCREMENT for table `inventory_transactions`
+--
+ALTER TABLE `inventory_transactions`
+  MODIFY `transaction_id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `login_history`
 --
 ALTER TABLE `login_history`
-  MODIFY `history_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `history_id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=56;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `notification_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=318;
+  MODIFY `notification_id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=329;
 
 --
 -- AUTO_INCREMENT for table `payments`
 --
 ALTER TABLE `payments`
-  MODIFY `payment_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `payment_id` int NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `reviews`
 --
 ALTER TABLE `reviews`
-  MODIFY `review_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=135;
+  MODIFY `review_id` int NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `services`
 --
 ALTER TABLE `services`
-  MODIFY `service_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `service_id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `service_categories`
 --
 ALTER TABLE `service_categories`
-  MODIFY `category_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `category_id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `technician_profiles`
 --
 ALTER TABLE `technician_profiles`
-  MODIFY `profile_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `profile_id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
+  MODIFY `user_id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
 
 --
 -- AUTO_INCREMENT for table `user_addresses`
 --
 ALTER TABLE `user_addresses`
-  MODIFY `address_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `address_id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- Constraints for dumped tables
