@@ -47,6 +47,7 @@ interface Appointment {
   cancellationReason?: string;
   cancellationCategory?: string;
   rejectionReason?: string;
+    totalCost?: string | number;
   cancelledByRole?: string;
   cancelledById?: string;
   category?: string;
@@ -181,6 +182,7 @@ export function Appointments() {
         cancellationReason: appt.cancellation_reason,
         cancellationCategory: appt.cancellation_category,
         rejectionReason: appt.rejection_reason,
+          totalCost: appt.total_cost,
         cancelledByRole: appt.cancelled_by_role,
         cancelledById: appt.cancelled_by_id,
         category: appt.category_name,

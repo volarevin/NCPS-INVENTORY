@@ -33,6 +33,7 @@ export interface Appointment {
   cancellationReason?: string;
   cancellationCategory?: string;
   rejectionReason?: string;
+    totalCost?: string | number;
   cancelledByRole?: string;
   cancelledById?: string;
   category?: string;

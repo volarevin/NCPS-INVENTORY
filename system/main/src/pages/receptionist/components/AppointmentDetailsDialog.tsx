@@ -18,6 +18,23 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+interface AppointmentPart {
+  item_id: number;
+  name: string;
+  unit: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number | null;
+}
 
 interface Appointment {
   id: string;
@@ -40,6 +57,7 @@ interface Appointment {
   rejectionReason?: string;
   cancelledByRole?: string;
   cancelledById?: string;
+  totalCost?: string | number;
   created_at?: string;
   updated_at?: string;
   customerAvatar?: string;
@@ -81,6 +99,9 @@ export function AppointmentDetailsDialog({
   const [isEditing, setIsEditing] = useState(false);
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
+  const [parts, setParts] = useState<AppointmentPart[]>([]);
+  const [partsSubtotal, setPartsSubtotal] = useState(0);
+  const [partsLoading, setPartsLoading] = useState(false);
   
   const [conflict, setConflict] = useState<ConflictDetails | null>(null);
   const [overrideConflict, setOverrideConflict] = useState(false);
@@ -113,6 +134,8 @@ export function AppointmentDetailsDialog({
         setIsEditing(false);
         setConflict(null);
         setOverrideConflict(false);
+        // fetch parts for this appointment (parts used + subtotal)
+        fetchParts(appointment.id);
       }
     }
   }, [open, appointment]);
@@ -171,6 +194,32 @@ export function AppointmentDetailsDialog({
     }
   };
 
+  const fetchParts = async (appointmentId: string) => {
+    try {
+      setPartsLoading(true);
+      const token = sessionStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/appointments/${appointmentId}/parts`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        setParts([]);
+        setPartsSubtotal(0);
+        return;
+      }
+
+      const data = await response.json();
+      setParts(Array.isArray(data.parts) ? data.parts : []);
+      setPartsSubtotal(Number(data.subtotal) || 0);
+    } catch (error) {
+      console.error('Error fetching appointment parts:', error);
+      setParts([]);
+      setPartsSubtotal(0);
+    } finally {
+      setPartsLoading(false);
+    }
+  };
+
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard`);
@@ -200,6 +249,10 @@ export function AppointmentDetailsDialog({
   };
 
   if (!appointment) return null;
+
+  const formatMoney = (value: number) => {
+    return `PHP ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -396,6 +449,62 @@ export function AppointmentDetailsDialog({
               <div className="bg-muted/30 p-4 rounded-xl border border-border text-sm leading-relaxed whitespace-pre-wrap">
                 {appointment.notes || "No notes provided."}
               </div>
+            </section>
+
+            <Separator />
+
+            {/* Parts Used */}
+            <section>
+              <h3 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider flex items-center gap-2">
+                <Wrench className="w-4 h-4" /> Parts Used
+              </h3>
+              <Card className="border-border shadow-sm">
+                <CardContent className="p-4">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Item</TableHead>
+                          <TableHead>Qty</TableHead>
+                          <TableHead>Unit Price</TableHead>
+                          <TableHead className="text-right">Line Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {partsLoading ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="h-16 text-center">Loading parts...</TableCell>
+                          </TableRow>
+                        ) : parts.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="h-16 text-center">No parts logged for this appointment.</TableCell>
+                          </TableRow>
+                        ) : (
+                          parts.map((part) => {
+                            const lineTotal = Number(part.line_total) || (Number(part.unit_price) || 0) * (Number(part.quantity) || 0);
+                            return (
+                              <TableRow key={`${part.item_id}-${part.name}`}>
+                                <TableCell className="font-medium">{part.name}</TableCell>
+                                <TableCell>{part.quantity} {part.unit}</TableCell>
+                                <TableCell>{formatMoney(part.unit_price)}</TableCell>
+                                <TableCell className="text-right">{formatMoney(lineTotal)}</TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="flex justify-end text-sm text-muted-foreground mt-3">
+                    Parts subtotal: {formatMoney(partsSubtotal)}
+                  </div>
+                  {appointment.totalCost && (
+                    <div className="flex justify-end text-base font-semibold text-foreground mt-1">
+                      Total Cost: {formatMoney(Number(appointment.totalCost))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </section>
 
           </div>

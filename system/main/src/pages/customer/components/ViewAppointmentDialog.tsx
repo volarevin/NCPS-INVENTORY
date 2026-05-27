@@ -6,6 +6,15 @@ import {
 } from "../../../components/ui/dialog";
 import { Calendar, Clock, MapPin, User, Phone, Mail, FileText, Check, Circle } from 'lucide-react';
 import { Button } from "../../../components/ui/button";
+import { useState, useEffect } from 'react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../../components/ui/table";
 
 interface ViewAppointmentDialogProps {
   open: boolean;
@@ -17,6 +26,42 @@ interface ViewAppointmentDialogProps {
 
 export function ViewAppointmentDialog({ open, onOpenChange, appointment, onEdit, onReschedule }: ViewAppointmentDialogProps) {
   if (!appointment) return null;
+
+  const [parts, setParts] = useState<any[]>([]);
+  const [partsSubtotal, setPartsSubtotal] = useState(0);
+  const [partsLoading, setPartsLoading] = useState(false);
+
+  const formatMoney = (value: number) => {
+    return `PHP ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  useEffect(() => {
+    const fetchParts = async () => {
+      if (!appointment || !appointment.id) return;
+      try {
+        setPartsLoading(true);
+        const token = sessionStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/api/appointments/${appointment.id}/parts`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) {
+          setParts([]);
+          setPartsSubtotal(0);
+          return;
+        }
+        const data = await response.json();
+        setParts(Array.isArray(data.parts) ? data.parts : []);
+        setPartsSubtotal(Number(data.subtotal) || 0);
+      } catch (err) {
+        console.error('Error fetching parts for customer view:', err);
+        setParts([]);
+        setPartsSubtotal(0);
+      } finally {
+        setPartsLoading(false);
+      }
+    };
+    fetchParts();
+  }, [appointment]);
 
   const statusColors: Record<string, string> = {
     pending: 'bg-orange-500',

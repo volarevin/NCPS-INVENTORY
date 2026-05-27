@@ -48,6 +48,7 @@ interface Appointment {
   rejectionReason?: string;
   cancelledByRole?: string;
   cancelledById?: string;
+  totalCost?: string | number;
   created_at?: string;
   updated_at?: string;
   customerAvatar?: string;
@@ -501,8 +502,11 @@ export function AppointmentDetailsDialog({
                   </div>
                   <div className="flex justify-end text-sm text-muted-foreground mt-3">
                     Parts subtotal: {formatMoney(partsSubtotal)}
-                  </div>
-                </CardContent>
+                  </div>                    {appointment.status === 'completed' && appointment.totalCost && (
+                      <div className="flex justify-end text-base font-semibold text-foreground mt-1">
+                        Total Cost: {formatMoney(Number(appointment.totalCost))}
+                      </div>
+                    )}                </CardContent>
               </Card>
             </section>
 
